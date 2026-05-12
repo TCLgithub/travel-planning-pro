@@ -1822,7 +1822,9 @@ async function generateAll(){
   if(!dests.length){toast('⚠ Enter at least one destination');return;}
   const start=$('start-date').value,end=$('end-date').value;
   if(!start||!end){toast('⚠ Select travel dates');return;}
-  if(!PROVIDERS.some(p=>!!localStorage.getItem('tppK_'+p))){toast('⚠ No API keys — open ⚙ Settings');return;}
+  if(!NETLIFY_MODE && !PROVIDERS.some(p=>!!localStorage.getItem('tppK_'+p))){
+    toast('⚠ No API keys — open ⚙ Settings to add one');return;
+  }
 
   const name=$('trip-name').value.trim()||(dests.join(' & ')+' Trip');
   const travellers=$('travellers').value;
@@ -1928,7 +1930,9 @@ CRITICAL: Return ONLY valid JSON. No markdown, no code fences, no text outside J
     // Show persistent error on the itinerary empty state so user can read it
     $('empty-itin-icon').textContent='⚠';
     $('empty-itin-title').textContent='Generation failed';
-    $('empty-itin-msg').textContent='Check your API keys and internet connection, then try again.';
+    $('empty-itin-msg').textContent=NETLIFY_MODE
+      ? 'Generation failed — check server environment variables in Render/Netlify dashboard, then try again.'
+      : 'Check your API keys in ⚙ Settings and internet connection, then try again.';
     const errDiv=$('empty-itin-err');
     errDiv.textContent=err.message;
     errDiv.style.display='block';
@@ -2259,7 +2263,9 @@ async function generateWeather(t){
         continue;
       }
       const isHist=wx._type==='historical';
-      const {time,temperature_2m_max:hi,temperature_2m_min:lo,precipitation_probability_mean:rain,weathercode:code}=wx.daily;
+      const {time,temperature_2m_max:hi,temperature_2m_min:lo,precipitation_probability_mean:rainArr,weathercode:code}=wx.daily;
+      // Historical data uses precipitation_sum not precipitation_probability_mean
+      const rain=rainArr||wx.daily.precipitation_sum?.map(v=>v!=null?Math.min(Math.round((v||0)*15),95):0)||time.map(()=>0);
       const daysHtml=time.map((dt,i)=>{
         const dow=new Date(dt).toLocaleString('en',{weekday:'short'});
         const dd=new Date(dt).getDate();
@@ -2657,70 +2663,104 @@ function _osmEmbed(query){
   return `https://www.openstreetmap.org/export/embed.html?layer=mapnik&marker=0,0&bbox=0,0,0,0#map=13&q=${q}`;
 }
 
-// Better: use maps.openrouteservice.org or embed via a leaflet-based approach
-// We'll render a Leaflet map inline instead of an iframe for full control
 function _buildLeafletMap(containerId, places, hotelName, city){
   const container=document.getElementById(containerId);
   if(!container)return;
-  // Build a Leaflet map inline
-  const mapId=containerId+'-lf';
-  container.innerHTML=`<div id="${mapId}" style="height:280px;width:100%;border-radius:0 0 8px 8px;z-index:0"></div>
-    <div id="${mapId}-status" style="display:none;padding:.5rem .75rem;font-size:.71rem;color:var(--ink-ll);text-align:center">📍 Geocoding locations…</div>`;
 
-  // Dynamically load Leaflet if not already loaded
+  const mapId='lf-'+containerId.replace(/[^a-zA-Z0-9]/g,'_');
+  container.style.height='280px';
+  container.innerHTML=`<div id="${mapId}" style="height:100%;width:100%;min-height:260px;z-index:0;border-radius:inherit"></div>`;
+
+  function buildQueryName(name,cityCtx){
+    // Use name alone if it already contains a comma (has location context)
+    if(!name)return cityCtx||'';
+    if(name.includes(','))return name;
+    return cityCtx ? `${name}, ${cityCtx}` : name;
+  }
+
   function initLeafletMap(){
     const L=window.L;
-    if(!L){setTimeout(initLeafletMap,200);return;}
-    const map=L.map(mapId,{zoomControl:true,scrollWheelZoom:false});
+    if(!L){setTimeout(initLeafletMap,300);return;}
+    // Destroy existing map instance if any
+    const el=document.getElementById(mapId);
+    if(!el)return;
+    if(el._leaflet_id)try{L.map(el).remove();}catch(e){}
+
+    const map=L.map(mapId,{zoomControl:true,scrollWheelZoom:false,attributionControl:true});
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-      attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',maxZoom:19
+      attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>',
+      maxZoom:19
     }).addTo(map);
 
-    // Geocode hotel + places via Nominatim (rate-limited, 1 req/s)
-    const toGeocode=[{name:hotelName+', '+city,isHotel:true},...places.map(p=>({name:p.name+', '+city,isHotel:false,type:p.type}))];
-    const markers=[];
-    let done=0;
+    // Set an initial view so map renders even before geocoding
+    map.setView([20,100],3);
 
-    function geocodeNext(i){
-      if(i>=toGeocode.length){
-        if(markers.length){
-          const group=L.featureGroup(markers);
-          map.fitBounds(group.getBounds().pad(0.15));
+    // Items to geocode: hotel first, then places
+    const toGeocode=[];
+    if(hotelName)toGeocode.push({q:buildQueryName(hotelName,city),isHotel:true,label:hotelName.split(',')[0]});
+    places.forEach(p=>{
+      if(p.name)toGeocode.push({q:buildQueryName(p.name,city),isHotel:false,type:p.type,label:p.name.split(',')[0]});
+    });
+
+    if(!toGeocode.length){
+      // No places — just show the city
+      if(city){
+        fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(city)}&limit=1`,{headers:{'Accept-Language':'en'}})
+          .then(r=>r.json()).then(d=>{if(d[0])map.setView([parseFloat(d[0].lat),parseFloat(d[0].lon)],12);}).catch(()=>{});
+      }
+      return;
+    }
+
+    const markers=[];
+    const hotelIcon=L.divIcon({html:'<div style="background:#C4862B;color:white;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-size:15px;box-shadow:0 2px 8px rgba(0,0,0,.4);border:2px solid white">🏨</div>',iconSize:[30,30],iconAnchor:[15,15],className:''});
+    const placeIcon=t=>L.divIcon({html:`<div style="background:#1A6B6B;color:white;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:13px;box-shadow:0 2px 6px rgba(0,0,0,.35);border:2px solid white">${{attraction:'📍',restaurant:'🍽',shopping:'🛍',experience:'🎯',transport:'🚉'}[t]||'📍'}</div>`,iconSize:[26,26],iconAnchor:[13,13],className:''});
+
+    let idx=0;
+    function next(){
+      if(idx>=toGeocode.length){
+        if(markers.length>=2){
+          try{map.fitBounds(L.featureGroup(markers).getBounds().pad(0.2));}catch(e){}
+        } else if(markers.length===1){
+          map.setView(markers[0].getLatLng(),14);
         }
         return;
       }
-      const item=toGeocode[i];
-      fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(item.name)}&limit=1`,
-        {headers:{'Accept-Language':'en'}})
+      const item=toGeocode[idx++];
+      fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(item.q)}&limit=1`,
+        {headers:{'Accept-Language':'en','User-Agent':'TravelPlanningPro/1.0'}})
         .then(r=>r.json())
         .then(data=>{
           if(data?.[0]){
             const lat=parseFloat(data[0].lat),lng=parseFloat(data[0].lon);
-            const icon=item.isHotel
-              ?L.divIcon({html:'<div style="background:#C4862B;color:white;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 6px rgba(0,0,0,.35)">🏨</div>',iconSize:[28,28],iconAnchor:[14,14],className:''})
-              :L.divIcon({html:`<div style="background:#1A6B6B;color:white;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:12px;box-shadow:0 2px 6px rgba(0,0,0,.3)">${{attraction:'📍',restaurant:'🍽',shopping:'🛍',experience:'🎯'}[item.type]||'📍'}</div>`,iconSize:[24,24],iconAnchor:[12,12],className:''});
+            const icon=item.isHotel?hotelIcon:placeIcon(item.type);
             const m=L.marker([lat,lng],{icon}).addTo(map);
-            m.bindPopup(`<strong>${item.name.split(',')[0]}</strong>`);
+            m.bindPopup(`<strong>${item.label}</strong>`);
             markers.push(m);
           }
         })
         .catch(()=>{})
-        .finally(()=>{
-          // Nominatim rate limit: 1 req/s
-          setTimeout(()=>geocodeNext(i+1), 1100);
-        });
+        .finally(()=>setTimeout(next,1200)); // Nominatim: max 1 req/s
     }
-    geocodeNext(0);
+    next();
   }
 
   if(!window.L){
-    const link=document.createElement('link');
-    link.rel='stylesheet';link.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-    document.head.appendChild(link);
-    const script=document.createElement('script');
-    script.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-    script.onload=initLeafletMap;
-    document.head.appendChild(script);
+    if(!document.getElementById('leaflet-css')){
+      const link=document.createElement('link');
+      link.id='leaflet-css';link.rel='stylesheet';
+      link.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(link);
+    }
+    if(!document.getElementById('leaflet-js')){
+      const script=document.createElement('script');
+      script.id='leaflet-js';
+      script.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      script.onload=initLeafletMap;
+      document.head.appendChild(script);
+    } else {
+      // Script tag exists but may still be loading
+      setTimeout(initLeafletMap,500);
+    }
   } else {
     initLeafletMap();
   }
@@ -2792,23 +2832,21 @@ function buildMap(t){
   });
   $('wpts-row').innerHTML=wHtml||'<div class="muted" style="font-size:.75rem;padding:.2rem">All legs are flights — see below for details.</div>';
 
-  // ── Embed: replace Google Maps iframe with Leaflet map ────────────────
-  const isCNTrip=CHINA_RE.test((t.destinations||[]).join(' '));
-  // Replace the static iframe with a Leaflet map
+  // ── Embed: Leaflet map for the main route view ───────────────────────
   const mapFrame=$('map-frame');
   if(mapFrame){
-    mapFrame.style.display='none'; // hide the old iframe
+    mapFrame.style.display='none';
     let leafletMainDiv=document.getElementById('map-frame-leaflet');
     if(!leafletMainDiv){
       leafletMainDiv=document.createElement('div');
       leafletMainDiv.id='map-frame-leaflet';
-      leafletMainDiv.style.cssText='width:100%;height:480px;background:var(--sand-d);z-index:0;position:relative';
-      mapFrame.parentNode.insertBefore(leafletMainDiv,'map-frame-leaflet'?null:mapFrame.nextSibling);
-      mapFrame.parentNode.insertBefore(leafletMainDiv,mapFrame.nextSibling);
+      leafletMainDiv.style.cssText='width:100%;height:480px;background:var(--sand-d);z-index:0;position:relative;border-radius:6px';
+      mapFrame.parentNode.insertBefore(leafletMainDiv,mapFrame);
     }
     leafletMainDiv.style.display='block';
-    // Build a multi-city route map
-    _buildLeafletMap('map-frame-leaflet', mapWps.map(w=>({name:w,type:'attraction'})), mapWps[0]||'', '');
+    // Pass cities as "places" so geocoding works — use first city as hotel anchor
+    const cityPlaces=mapWps.map(w=>({name:w,type:'attraction'}));
+    _buildLeafletMap('map-frame-leaflet', cityPlaces.slice(1), mapWps[0]||'', mapWps[0]||'');
   }
 
   // ── Header links ───────────────────────────────────────────────────
@@ -2980,17 +3018,25 @@ function buildCityMaps(t){
   container.innerHTML=cardData.length
     ?`<div class="sec-hdr" style="margin-top:1.2rem">
         <div class="sec-title">🏙 City Maps</div>
-        <div class="muted" style="font-size:.72rem">Tap 🗺 Google Maps ↗ for turn-by-turn directions. Interactive maps load below.</div>
+        <div class="muted" style="font-size:.72rem">Interactive maps load below — pins appear as geocoding completes (~10s). Tap 🗺 Google Maps ↗ for turn-by-turn directions.</div>
       </div>`+cards.join('')
     :'';
 
-  // Now render Leaflet maps into each card (after DOM is ready)
-  requestAnimationFrame(()=>{
-    cardData.forEach(([city,d])=>{
-      const leafletId=`lf-${d.hotelIdx}`;
-      _buildLeafletMap(leafletId, d.places.slice(0,4), d.hotel.name, city);
+  // Render Leaflet maps after DOM is ready — pass city as context for geocoding
+  if(cardData.length){
+    requestAnimationFrame(()=>{
+      cardData.forEach(([city,d])=>{
+        const leafletId=`lf-${d.hotelIdx}`;
+        // Pass up to 4 places; hotel name + city gives Nominatim enough context
+        _buildLeafletMap(
+          leafletId,
+          d.places.slice(0,4),
+          d.hotel.name,  // hotel as anchor
+          city           // city context for all geocoding queries
+        );
+      });
     });
-  });
+  }
 }
 
 function changeHotel(idx){
@@ -5420,9 +5466,11 @@ function loadDemo(){
     </div>`;
 
   // ── Map tab ──
-  try{buildMap(tripData);}catch(e){}
+  try{buildMap(tripData);}catch(e){console.error('buildMap:',e);}
 
   // ── Build dynamic sections from structured data ──
+  // buildDays renders the structured days with correct di/ai indices for calendar export
+  try{buildDays(tripData, tripData._meta?.days||(tripData.days||[]).length);}catch(e){console.error('buildDays:',e);}
   try{buildMustSee(tripData);}catch(e){console.error('buildMustSee:',e);}
   try{
     const sec=$('hotels-sec');
@@ -5446,7 +5494,11 @@ function loadDemo(){
   }catch(e){}
 
   goTab('itin');
-  toast('📍 Demo: Wonders of Canada 19-day plan loaded. Enter API keys in ⚙ Settings to generate your own trip.',8000);
+  if(NETLIFY_MODE){
+    toast('📍 Demo: Wonders of Canada loaded. Fill in your destination and dates above to generate your own trip!',7000);
+  } else {
+    toast('📍 Demo loaded. Enter API keys in ⚙ Settings to generate your own trip.',7000);
+  }
 }
 
 // ══ GOOGLE CALENDAR EXPORT ══
@@ -6031,7 +6083,7 @@ async function applyAIModification(){
   const instruction=($('modify-prompt')?.value||'').trim();
   if(!instruction){toast('⚠ Describe your changes first');return;}
 
-  const hasKey=PROVIDERS.some(p=>!!localStorage.getItem('tppK_'+p));
+  const hasKey=NETLIFY_MODE||PROVIDERS.some(p=>!!localStorage.getItem('tppK_'+p));
   if(!hasKey){
     toast('⚠ No API keys — open ⚙ Settings to add one');
     return;
