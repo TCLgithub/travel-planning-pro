@@ -3230,7 +3230,7 @@ function buildCityMaps(t){
       let gmEmbedSrc;
       if(places.length){
         const gmWps=[...places.map(p=>gmEnc(p.name+', '+gmCtx)),gmOrigin].join('+to:');
-        gmEmbedSrc=`https://maps.google.com/maps?saddr=${gmOrigin}&daddr=${gmWps}&output=embed&dirflg=w`;
+        gmEmbedSrc=`https://maps.google.com/maps?saddr=${gmOrigin}&daddr=${gmWps}&output=embed&dirflg=r`;
       }else{
         gmEmbedSrc=`https://maps.google.com/maps?q=${gmOrigin}&output=embed`;
       }
