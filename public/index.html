@@ -2019,7 +2019,9 @@ async function generateGuideAndBudget(t){
 
 TRIP: ${destStr} | ${m.days} days | From: ${m.homeCity||'KL'} (${m.flightClass||'Economy'}) | Travellers: ${m.travellers||'2 adults'} | Budget: ${m.budget||'Mid-range'} | Style: ${m.style||'Cultural'} | Transport: ${m.transport||'Taxi'} | Food: ${m.food||'Local cuisine'} | Diet: ${m.diet||'No restrictions'}
 
-IMPORTANT for currency: show conversion TO MYR (Malaysian Ringgit), because the traveller is from Malaysia. Format: "1 [local currency] ≈ X.XX MYR". Include the digital/electronic arrival card or eTA URL if required for Malaysians entering ${destStr}.
+IMPORTANT for currency in localGuide: show the local currency name and the conversion rate TO MYR (Malaysian Ringgit). Format: "1 [local currency] ≈ X.XX MYR". Include the digital/electronic arrival card or eTA URL if required for Malaysians entering ${destStr}.
+
+IMPORTANT for highLevelBudget: ALL amounts MUST be in MYR (Malaysian Ringgit). Set "currency":"MYR". Do NOT use local currency amounts. Use realistic MYR amounts for a Malaysian traveller.
 
 Return ONLY valid JSON — no markdown, no code fences, nothing outside JSON:
 {
@@ -2049,8 +2051,7 @@ Return ONLY valid JSON — no markdown, no code fences, nothing outside JSON:
     "closingNote":"One memorable inspiring closing sentence about the destination."
   },
   "highLevelBudget":{
-    "currency":"${cur}",
-    "myrRate":3.33,
+    "currency":"MYR",
     "items":[
       {"category":"Flights (return pp)","low":800,"mid":1200,"high":2000,"note":"Book 8+ weeks ahead"},
       {"category":"Accommodation (${m.days} nights)","low":600,"mid":1100,"high":2200,"note":"Per person share"},
