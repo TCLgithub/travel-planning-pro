@@ -1348,6 +1348,16 @@ function goTab(t){
     $('tab-'+id)?.classList.toggle('active',id===t);
     $('panel-'+id)?.classList.toggle('active',id===t);
   });
+  // When switching to map tab, invalidate Leaflet size so tiles fill the container
+  if(t==='map'){
+    setTimeout(()=>{
+      if(window._leafletMaps){
+        Object.values(window._leafletMaps).forEach(m=>{
+          try{m.invalidateSize();}catch(e){}
+        });
+      }
+    },50);
+  }
 }
 
 // ══ SETTINGS ══
@@ -2839,21 +2849,15 @@ function _buildLeafletMap(containerId, places, hotelName, city){
     if(!L){setTimeout(initLeafletMap,300);return;}
     const el=document.getElementById(mapId);
     if(!el)return;
-    // Safe destroy: Leaflet stores map instances internally keyed by _leaflet_id
-    if(el._leaflet_id){
-      try{
-        // Access Leaflet's internal map registry
-        const existing=L.map(el);// this throws if already initialised — catch it
-        existing.remove();
-      }catch(e){
-        // Already removed or can't get ref — just reset the innerHTML again
-        el.innerHTML='';
-        el.removeAttribute('data-leaflet');
-        delete el._leaflet_id;
-      }
-    }
+    // container.innerHTML was already wiped above — the div is guaranteed fresh
+    // so no destroy needed. If _leaflet_id somehow exists, the div was recreated
+    // with a new DOM node so Leaflet won't see it as already-initialised.
 
     const map=L.map(mapId,{zoomControl:true,scrollWheelZoom:false,attributionControl:true});
+    // Register in global map store for tab-switch invalidation
+    window._leafletMaps=window._leafletMaps||{};
+    window._leafletMaps[mapId]=map;
+
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
       attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>',
       maxZoom:19
@@ -2862,6 +2866,11 @@ function _buildLeafletMap(containerId, places, hotelName, city){
     // Set initial view immediately from built-in DB — no async needed
     const cityCoord=resolveCityCoords(city)||resolveCityCoords(hotelName);
     map.setView(cityCoord||[20,0], cityCoord?12:2);
+
+    // invalidateSize fixes "tiles only in top-left corner" when container
+    // was hidden or had zero size when Leaflet first initialised
+    setTimeout(()=>{ try{map.invalidateSize();}catch(e){} }, 100);
+    setTimeout(()=>{ try{map.invalidateSize();}catch(e){} }, 500);
 
     const toGeocode=[];
     if(hotelName)toGeocode.push({q:buildQueryName(hotelName,city),isHotel:true,label:hotelName.split(',')[0]});
@@ -3004,13 +3013,13 @@ function buildMap(t){
     if(!leafletMainDiv){
       leafletMainDiv=document.createElement('div');
       leafletMainDiv.id='map-frame-leaflet';
-      leafletMainDiv.style.cssText='width:100%;height:480px;background:var(--sand-d);z-index:0;position:relative;border-radius:6px';
       mapFrame.parentNode.insertBefore(leafletMainDiv,mapFrame);
     }
-    leafletMainDiv.style.display='block';
-    // Pass cities as "places" so geocoding works — use first city as hotel anchor
-    const cityPlaces=mapWps.map(w=>({name:w,type:'attraction'}));
-    _buildLeafletMap('map-frame-leaflet', cityPlaces.slice(1), mapWps[0]||'', mapWps[0]||'');
+    leafletMainDiv.style.cssText='width:100%;height:480px;background:var(--sand-d);z-index:0;position:relative;border-radius:6px;display:block';
+    // Pass all cities as places with first city as anchor — all lowercased for DB lookup
+    const cityPlaces=mapWps.slice(1).map(w=>({name:w,type:'attraction'}));
+    const firstCity=mapWps[0]||'';
+    _buildLeafletMap('map-frame-leaflet', cityPlaces, firstCity, firstCity);
   }
 
   // ── Header links ───────────────────────────────────────────────────
