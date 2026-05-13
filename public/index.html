@@ -74,9 +74,14 @@ textarea{resize:vertical;min-height:58px}
 /* MULTI-DEST */
 .dest-list{display:flex;flex-direction:column;gap:.45rem;margin-bottom:.45rem}
 .dest-row{display:flex;gap:.38rem;align-items:center}
-.dest-row input{margin-bottom:0;flex:1}
+.dest-row .dest-input{margin-bottom:0;flex:1}
 .dest-del{background:none;border:1px solid var(--border);border-radius:4px;color:var(--ink-ll);cursor:pointer;padding:.35rem .5rem;font-size:.72rem;flex-shrink:0;transition:all .12s}
 .dest-del:hover{border-color:#c0392b;color:#c0392b}
+.dest-nights-wrap{display:flex;align-items:center;gap:.18rem;flex-shrink:0}
+.dest-nights{width:46px;text-align:center;border:1px solid var(--border);border-radius:4px;padding:.32rem .25rem;font-size:.75rem;color:var(--ink);background:var(--white);margin:0;-moz-appearance:textfield}
+.dest-nights::-webkit-outer-spin-button,.dest-nights::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.dest-nights:focus{border-color:var(--teal);outline:none}
+.dest-nights-lbl{font-size:.65rem;color:var(--ink-ll);white-space:nowrap;user-select:none}
 .add-dest-btn{background:none;border:1px dashed var(--border);border-radius:4px;color:var(--ink-ll);cursor:pointer;padding:.35rem .8rem;font-size:.72rem;font-family:'DM Sans',sans-serif;width:100%;margin-bottom:.72rem;transition:all .12s}
 .add-dest-btn:hover{border-color:var(--gold);color:var(--gold)}
 /* SEASON PILLS */
@@ -548,10 +553,15 @@ a{color:inherit;text-decoration:none}.muted{color:var(--ink-ll);font-size:.72rem
     <div class="dest-list" id="dest-list">
       <div class="dest-row" data-idx="0">
         <input type="text" class="dest-input" placeholder="e.g. Tokyo, Japan" oninput="onDestInput(0,this.value)">
+        <div class="dest-nights-wrap" title="Nights in this city — leave blank and AI will decide the split">
+          <input type="number" class="dest-nights" min="1" max="90" placeholder="?" oninput="updateNightsSummary()">
+          <span class="dest-nights-lbl">nts</span>
+        </div>
         <button class="dest-del" onclick="removeDest(this)">✕</button>
       </div>
     </div>
     <button class="add-dest-btn" onclick="addDest()">+ Add another destination</button>
+    <div id="nights-summary" style="font-size:.72rem;color:var(--ink-ll);margin:.2rem 0 .05rem;min-height:1em"></div>
     <div class="suggest-wrap" id="suggest-wrap"></div>
 
     <!-- SEASON / PERIOD SUGGESTIONS -->
@@ -1221,6 +1231,10 @@ function addSuggestedCity(city,country,btn){
   if(!allSameCountry){
     list.innerHTML=`<div class="dest-row" data-idx="0">
       <input type="text" class="dest-input" placeholder="e.g. Tokyo, Japan" oninput="onDestInput(0,this.value)">
+      <div class="dest-nights-wrap" title="Nights in this city — leave blank and AI will decide the split">
+        <input type="number" class="dest-nights" min="1" max="90" placeholder="?" oninput="updateNightsSummary()">
+        <span class="dest-nights-lbl">nts</span>
+      </div>
       <button class="dest-del" onclick="removeDest(this)">✕</button></div>`;
     $('suggest-wrap').innerHTML='';
     destSelected={};destCount=1;
@@ -1274,10 +1288,11 @@ const fmtD=s=>{try{return new Date(s).toLocaleDateString('en-GB',{day:'numeric',
 function updateTripDuration(){
   const s=$('start-date').value,e=$('end-date').value,el=$('trip-duration');
   if(!el)return;
-  if(!s||!e){el.textContent='';return;}
+  if(!s||!e){el.textContent='';updateNightsSummary();return;}
   const d=Math.max(1,Math.ceil((new Date(e)-new Date(s))/86400000)+1);
   const n=Math.max(0,d-1);
   el.textContent=`${d}D${n}N`;
+  updateNightsSummary();
 }
 const getAct=id=>[...document.querySelectorAll(`#${id} .tag.active`)].map(t=>t.textContent.trim()).join(', ');
 const daysBetween=(a,b)=>Math.max(1,Math.ceil((new Date(b)-new Date(a))/86400000)+1);
@@ -1319,8 +1334,13 @@ function startNewTrip(){
   // Reset destination inputs to single empty row
   $('dest-list').innerHTML=`<div class="dest-row" data-idx="0">
     <input type="text" class="dest-input" placeholder="e.g. Tokyo, Japan" oninput="onDestInput(0,this.value)">
+    <div class="dest-nights-wrap" title="Nights in this city — leave blank and AI will decide the split">
+      <input type="number" class="dest-nights" min="1" max="90" placeholder="?" oninput="updateNightsSummary()">
+      <span class="dest-nights-lbl">nts</span>
+    </div>
     <button class="dest-del" onclick="removeDest(this)">✕</button>
   </div>`;
+  updateNightsSummary();
   $('suggest-wrap').innerHTML='';
   $('city-suggest-row').style.display='none';
   $('season-box').style.display='none';
@@ -1470,7 +1490,7 @@ function addDest(){
   const idx=destCount++;
   const row=document.createElement('div');
   row.className='dest-row';row.dataset.idx=idx;
-  row.innerHTML=`<input type="text" class="dest-input" placeholder="e.g. Kyoto, Japan" oninput="onDestInput(${idx},this.value)"><button class="dest-del" onclick="removeDest(this)">✕</button>`;
+  row.innerHTML=`<input type="text" class="dest-input" placeholder="e.g. Kyoto, Japan" oninput="onDestInput(${idx},this.value)"><div class="dest-nights-wrap" title="Nights in this city — leave blank and AI will decide the split"><input type="number" class="dest-nights" min="1" max="90" placeholder="?" oninput="updateNightsSummary()"><span class="dest-nights-lbl">nts</span></div><button class="dest-del" onclick="removeDest(this)">✕</button>`;
   $('dest-list').appendChild(row);
   const inp=row.querySelector('input');
   inp.focus();
@@ -1485,9 +1505,37 @@ function removeDest(btn){
   delete destSelected[idx];
   delete _destCountries[idx];
   syncChipsToNotes();
+  updateNightsSummary();
+}
+function updateNightsSummary(){
+  const el=$('nights-summary');if(!el)return;
+  const s=$('start-date').value,e=$('end-date').value;
+  const totalNights=s&&e?Math.max(0,Math.ceil((new Date(e)-new Date(s))/86400000)):0;
+  const inputs=[...document.querySelectorAll('.dest-nights')];
+  const filled=inputs.filter(i=>i.value.trim()!=='');
+  if(!filled.length){el.textContent=totalNights?`AI will auto-split ${totalNights} nights across your destinations`:'';return;}
+  const specified=filled.reduce((s,i)=>s+parseInt(i.value||0),0);
+  const dests=inputs.length;
+  const unspecified=inputs.filter(i=>i.value.trim()==='').length;
+  if(totalNights){
+    if(specified===totalNights&&!unspecified){el.textContent=`✓ ${specified} nights allocated across ${dests} ${dests===1?'city':'cities'}`;el.style.color='var(--teal)';}
+    else if(specified>totalNights){el.textContent=`⚠ ${specified} nights specified but trip is only ${totalNights} nights`;el.style.color='#c0392b';}
+    else if(unspecified){el.textContent=`${specified}/${totalNights} nights specified — AI will fill remaining ${totalNights-specified} nights`;el.style.color='var(--ink-ll)';}
+    else{el.textContent=`${specified}/${totalNights} nights specified`;el.style.color='var(--ink-ll)';}
+  }else{
+    el.textContent=filled.length?`${specified} nights specified`:'';
+    el.style.color='var(--ink-ll)';
+  }
 }
 function getDestinations(){
   return [...document.querySelectorAll('.dest-input')].map(i=>i.value.trim()).filter(Boolean);
+}
+function getNightsAllocation(){
+  // Returns parallel array to getDestinations(); null entries = AI decides
+  const rows=[...document.querySelectorAll('.dest-row')];
+  return rows
+    .filter(r=>r.querySelector('.dest-input')?.value.trim())
+    .map(r=>{const v=r.querySelector('.dest-nights')?.value.trim();return v?parseInt(v):null;});
 }
 function getPrimaryKey(){
   const dests=getDestinations();
@@ -1851,6 +1899,10 @@ async function generateAll(){
   const special=$('special').value.trim();
   const days=daysBetween(start,end);
   const destStr=dests.join(', ');
+  const nightsPerCity=getNightsAllocation();
+  const nightsStr=nightsPerCity.some(n=>n!=null)
+    ?'Nights per city: '+dests.map((d,i)=>nightsPerCity[i]!=null?`${d.split(',')[0].trim()}=${nightsPerCity[i]}n`:`${d.split(',')[0].trim()}=auto`).join(', ')+'. Respect these splits exactly; only auto-allocate cities marked auto.'
+    :'';
   const CHINESE_REGIONS=/china|taiwan|hong kong|shanghai|beijing|suzhou|hangzhou|guangzhou|shenzhen|chengdu|nanjing|wuhan|xi'an|xian|guilin|chongqing|kunming|taipei|macau|macao/i;
   const isChinese=dests.some(d=>CHINESE_REGIONS.test(d));
 
@@ -1868,7 +1920,7 @@ async function generateAll(){
   // ── PART 1 PROMPT: itinerary only (lean — keeps response well under token limits) ──
   const prompt=`You are a world-class travel planner. Create a ${days}-day travel itinerary.
 
-TRIP: ${name} | ${destStr} | ${start}→${end} | ${travellers} | From: ${homeCity} (${flightClass}) | Budget: ${budget} | Style: ${style} | Pace: ${pace} | Accom: ${accom} (${accomLoc}) | Transport: ${transport} | Diet: ${diet} | Food: ${food}${special?` | Special: ${special}`:''}
+TRIP: ${name} | ${destStr} | ${start}→${end} | ${travellers} | From: ${homeCity} (${flightClass}) | Budget: ${budget} | Style: ${style} | Pace: ${pace} | Accom: ${accom} (${accomLoc}) | Transport: ${transport} | Diet: ${diet} | Food: ${food}${special?` | Special: ${special}`:''}${nightsStr?`\n${nightsStr}`:''}
 
 FLIGHT TIME RULES:
 - Outbound >4h from ${homeCity}: Day 1 = arrival only (airport→hotel→dinner). Title "Arrival Day".
@@ -1926,7 +1978,7 @@ CRITICAL: Return ONLY valid JSON. No markdown, no code fences, no text outside J
       catch(pe2){throw new Error('JSON parse failed — response may be truncated. Try again. ('+pe.message+')');}
     }
     tripData={...t,_meta:{start,end,days,travellers,homeCity,flightClass,provider,model,dests,
-      tripName:name,budget,style,accom,accomLoc,transport,diet,food,pace,special}};
+      tripName:name,budget,style,accom,accomLoc,transport,diet,food,pace,special,nightsPerCity}};
     saveTrip(tripData);
     try{renderItinerary(tripData);}catch(re){console.error('renderItinerary:',re);}
     goTab('itin');
@@ -2386,10 +2438,17 @@ async function generateWeather(t){
     if(!daysByCity[c])daysByCity[c]={city:c,dates:[]};
     if(day.date)daysByCity[c].dates.push(day.date);
   });
-  // Fallback: use destinations with overall date range
-  if(!Object.keys(daysByCity).length){
-    (t.destinations||[t.destination]).forEach(d=>{if(d)daysByCity[d]={city:d,dates:[t._meta?.start,t._meta?.end].filter(Boolean)};});
-  }
+  // Merge destination cities that aren't already covered by daysByCity
+  // (catches cities with no day entries — e.g. transit stops, demo with partial days)
+  (t.destinations||[t.destination||'']).forEach(dest=>{
+    if(!dest)return;
+    const base=dest.split(',')[0].trim();
+    const covered=Object.keys(daysByCity).some(k=>{
+      const kl=k.toLowerCase(),bl=base.toLowerCase();
+      return kl===bl||kl.includes(bl)||bl.includes(kl);
+    });
+    if(!covered) daysByCity[base]={city:base,dates:[t._meta?.start,t._meta?.end].filter(Boolean)};
+  });
   for(const[city,info]of Object.entries(daysByCity)){
     cities.push({city,start:info.dates[0]||t._meta?.start,end:info.dates[info.dates.length-1]||t._meta?.end});
   }
@@ -2816,7 +2875,7 @@ function _osmEmbed(query){
   return `https://www.openstreetmap.org/export/embed.html?layer=mapnik&marker=0,0&bbox=0,0,0,0#map=13&q=${q}`;
 }
 
-function _buildLeafletMap(containerId, places, hotelName, city){
+function _buildLeafletMap(containerId, places, hotelName, city, drawRoute){
   const container=document.getElementById(containerId);
   if(!container)return;
 
@@ -2884,33 +2943,42 @@ function _buildLeafletMap(containerId, places, hotelName, city){
     }
 
     const markers=[];
+    // orderedLatLngs keeps geocoded positions in toGeocode order for polyline drawing
+    const orderedLatLngs=new Array(toGeocode.length).fill(null);
     const hotelIcon=L.divIcon({html:'<div style="background:#C4862B;color:white;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 8px rgba(0,0,0,.4);border:2px solid white">🏨</div>',iconSize:[30,30],iconAnchor:[15,15],className:''});
     const placeIcon=t=>L.divIcon({html:`<div style="background:#1A6B6B;color:white;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:13px;box-shadow:0 2px 6px rgba(0,0,0,.35);border:2px solid white">${{attraction:'📍',restaurant:'🍽',shopping:'🛍',experience:'🎯',transport:'🚉'}[t]||'📍'}</div>`,iconSize:[26,26],iconAnchor:[13,13],className:''});
 
-    function placeMarker(lat,lng,item){
+    function placeMarker(lat,lng,item,seq){
       const icon=item.isHotel?hotelIcon:placeIcon(item.type);
       const m=L.marker([lat,lng],{icon}).addTo(map);
       m.bindPopup(`<strong>${item.label}</strong>`);
       markers.push(m);
+      if(seq!=null)orderedLatLngs[seq]=[lat,lng];
     }
     function fitMarkers(){
-      if(markers.length>=2){try{map.fitBounds(L.featureGroup(markers).getBounds().pad(0.2));}catch(e){}}
+      // Draw route polyline when requested (route overview map)
+      if(drawRoute){
+        const pts=orderedLatLngs.filter(Boolean);
+        if(pts.length>=2) L.polyline(pts,{color:'#1A6B6B',weight:3,opacity:.7,dashArray:'8,5'}).addTo(map);
+      }
+      if(markers.length>=2){try{map.fitBounds(L.featureGroup(markers).getBounds().pad(0.25));}catch(e){}}
       else if(markers.length===1){map.setView(markers[0].getLatLng(),14);}
     }
 
     let idx=0;
     function next(){
       if(idx>=toGeocode.length){fitMarkers();return;}
+      const seq=idx;
       const item=toGeocode[idx++];
       // 1. Built-in DB (instant)
       const coords=resolveCityCoords(item.label)||resolveCityCoords(item.q);
-      if(coords){placeMarker(coords[0],coords[1],item);setTimeout(next,30);return;}
+      if(coords){placeMarker(coords[0],coords[1],item,seq);setTimeout(next,30);return;}
       // 2. Photon fallback (CORS-friendly, no key)
       fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(item.q)}&limit=1&lang=en`)
         .then(r=>r.json())
         .then(data=>{
           const f=data?.features?.[0];
-          if(f){const[lng,lat]=f.geometry.coordinates;placeMarker(lat,lng,item);}
+          if(f){const[lng,lat]=f.geometry.coordinates;placeMarker(lat,lng,item,seq);}
         })
         .catch(()=>{})
         .finally(()=>setTimeout(next,400));
@@ -3019,7 +3087,7 @@ function buildMap(t){
     // Pass all cities as places with first city as anchor — all lowercased for DB lookup
     const cityPlaces=mapWps.slice(1).map(w=>({name:w,type:'attraction'}));
     const firstCity=mapWps[0]||'';
-    _buildLeafletMap('map-frame-leaflet', cityPlaces, firstCity, firstCity);
+    _buildLeafletMap('map-frame-leaflet', cityPlaces, firstCity, firstCity, true/*drawRoute*/);
   }
 
   // ── Header links ───────────────────────────────────────────────────
@@ -3090,67 +3158,73 @@ function buildCityMaps(t){
   if(!container)return;
   const allDests=(t.destinations||[]).join(' ')+' '+((t._meta?.dests||[]).join(' '));
 
-  // Build per-city data
+  // Build per-city data — normalise city keys to lowercase base name for fuzzy matching
   const cityData={};
+  // Helper: normalise "Seoul, South Korea" → "seoul"
+  const normCity=s=>(s||'').split(',')[0].trim().toLowerCase();
+  // Find the cityData key that best matches a raw city string
+  function findCityKey(rawCity){
+    const n=normCity(rawCity);
+    if(!n)return null;
+    // Exact normalised match
+    if(cityData[n])return n;
+    // Partial match both ways
+    for(const k of Object.keys(cityData)){
+      if(k.includes(n)||n.includes(k))return k;
+    }
+    return null;
+  }
+
   (t.hotels||[]).forEach((h,idx)=>{
     const city=(h.city||'').trim();
     if(!city)return;
-    if(!cityData[city])cityData[city]={hotel:null,hotelIdx:-1,places:[]};
-    cityData[city].hotel=h;cityData[city].hotelIdx=idx;
+    const key=normCity(city);
+    if(!cityData[key])cityData[key]={hotel:null,hotelIdx:-1,places:[],displayCity:city};
+    cityData[key].hotel=h;cityData[key].hotelIdx=idx;
   });
 
   (t.mustSeeAttractions||[]).forEach(a=>{
-    const city=(a.city||'').trim();
-    if(!city||!cityData[city])return;
+    const key=findCityKey(a.city||'');
+    if(!key)return;
     const name=cleanPlaceName(a.name);
-    if(name&&!cityData[city].places.find(p=>p.name===name))
-      cityData[city].places.push({name,type:'attraction'});
+    if(name&&!cityData[key].places.find(p=>p.name===name))
+      cityData[key].places.push({name,type:'attraction'});
   });
 
   (t.days||[]).forEach(day=>{
-    const city=(day.city||'').trim();
-    if(!city||!cityData[city])return;
+    const key=findCityKey(day.city||'');
+    if(!key)return;
     (day.activities||[]).forEach(act=>{
       if(!['attraction','restaurant','shopping','experience'].includes(act.type))return;
       const name=cleanPlaceName(act.name);
-      if(name&&!cityData[city].places.find(p=>p.name===name))
-        cityData[city].places.push({name,type:act.type||'attraction'});
+      if(name&&!cityData[key].places.find(p=>p.name===name))
+        cityData[key].places.push({name,type:act.type||'attraction'});
     });
   });
 
   const typeIcon={attraction:'📍',restaurant:'🍽',shopping:'🛍',experience:'🎯'};
 
-  const cards=Object.entries(cityData)
-    .filter(([,d])=>d.hotel&&d.places.length)
-    .map(([city,d])=>{
+  // Show city map card for every city that has a hotel (places optional — just hotel pin if none)
+  const cardData=Object.entries(cityData).filter(([,d])=>d.hotel);
+
+  const cards=cardData.map(([,d])=>{
       const h=d.hotel;
+      const city=d.displayCity||h.city||'';  // original-case display name
       const isCN=CHINA_RE.test(city)||CHINA_RE.test(allDests);
       const country=isCN?', China':'';
       const places=d.places.slice(0,4); // hard cap — fewer = better geocoding
       const hotelQ=`${h.name}, ${city}${country}`;
 
-      // ── Embed strategy ──────────────────────────────────────────────
-      // Google Maps embed now requires a paid API key — use OpenStreetMap instead.
-      // For the city map card we show an OSM iframe centred on the hotel area;
-      // the "Google Maps ↗" button still links to Google for turn-by-turn directions.
-      let embedSrc;
-      const osmBase='https://www.openstreetmap.org/export/embed.html';
-      if(isCN){
-        // China: use Amap web embed via a search URL shown inside iframe
-        embedSrc=`${osmBase}?bbox=113.0,22.0,122.0,40.0&layer=mapnik&marker=39.9042,116.4074`;
-      } else {
-        // Use OSM search embed centred on the hotel/city
-        const cityForOSM=encodeURIComponent(city+(country?', '+country.replace(', ',''):''));
-        embedSrc=_osmEmbed(hotelQ);
-      }
-
-      // ── External link ───────────────────────────────────────────────
+      // ── External links ──────────────────────────────────────────────
       const wps=places.map(p=>esc(p.name+', '+city+country));
-      const googleDirUrl=`https://www.google.com/maps/dir/?api=1&origin=${esc(hotelQ)}&destination=${esc(hotelQ)}&waypoints=${wps.join('|')}&travelmode=walking`;
-      const amapUrl=`https://www.amap.com/dir?origin[name]=${encodeURIComponent(h.name)}&destination[name]=${encodeURIComponent(places[0]?.name+', '+city)}&type=walk&src=travel-pro`;
+      const googleDirUrl=places.length
+        ?`https://www.google.com/maps/dir/?api=1&origin=${esc(hotelQ)}&destination=${esc(hotelQ)}&waypoints=${wps.join('|')}&travelmode=walking`
+        :`https://www.google.com/maps/search/?api=1&query=${esc(hotelQ)}`;
+      const amapUrl=`https://www.amap.com/dir?origin[name]=${encodeURIComponent(h.name)}&destination[name]=${encodeURIComponent((places[0]?.name||city)+', '+city)}&type=walk&src=travel-pro`;
 
       const mapCardId=`city-map-${d.hotelIdx}`;
       const leafletId=`lf-${d.hotelIdx}`;
+      const isKorea=/korea|korean|seoul|busan|jeju|incheon|daegu|daejeon|gwangju/i.test(city+allDests);
       return `
       <div class="map-card" id="${mapCardId}">
         <div class="map-hdr">
@@ -3158,13 +3232,13 @@ function buildCityMaps(t){
           <div style="display:flex;gap:.3rem;align-items:center;flex-wrap:wrap">
             <a href="${googleDirUrl}" target="_blank" class="btn btn-ghost btn-sm">🗺 Google Maps ↗</a>
             ${isCN?`<a href="${amapUrl}" target="_blank" class="btn btn-ghost btn-sm" style="color:#1677ff;border-color:#1677ff">高德地图 ↗</a>`:''}
-            ${/korea|korean|seoul|busan|jeju|incheon|daegu|daejeon|gwangju/i.test(city+allDests)?`<a href="https://map.kakao.com/?q=${encodeURIComponent(city)}" target="_blank" class="btn btn-ghost btn-sm" style="color:#FAE100;background:#391B1B;border-color:#5D3A1A">카카오맵 ↗</a>`:''}
+            ${isKorea?`<a href="https://map.kakao.com/?q=${encodeURIComponent(city)}" target="_blank" class="btn btn-ghost btn-sm" style="color:#FAE100;background:#391B1B;border-color:#5D3A1A">카카오맵 ↗</a>`:''}
           </div>
         </div>
         <div class="wpts-row" style="flex-wrap:wrap">
           <div class="wpt" style="background:var(--gold-ll);border:1px solid var(--gold);font-weight:600">🏨 ${h.name}</div>
           ${places.map(p=>`<div class="wpt-seg">→</div><div class="wpt">${typeIcon[p.type]||'📍'} ${p.name}</div>`).join('')}
-          <div class="wpt-seg">→</div><div class="wpt" style="color:var(--ink-ll);font-size:.73rem">🏨 return</div>
+          ${places.length?`<div class="wpt-seg">→</div><div class="wpt" style="color:var(--ink-ll);font-size:.73rem">🏨 return</div>`:''}
         </div>
         <div id="${leafletId}" style="height:280px;width:100%;background:var(--sand-d);display:flex;align-items:center;justify-content:center">
           <div style="text-align:center;color:var(--ink-ll);font-size:.75rem"><div style="font-size:1.5rem;margin-bottom:.4rem">🗺</div>Loading map…</div>
@@ -3172,14 +3246,11 @@ function buildCityMaps(t){
         ${isCN?`<div style="padding:.45rem .95rem;background:var(--sand);border-top:1px solid var(--border);font-size:.71rem;color:var(--ink-ll)">
           💡 Use <a href="${amapUrl}" target="_blank" style="color:#1677ff;font-weight:600">高德地图 (Amap)</a> or <a href="https://map.baidu.com/search/${encodeURIComponent(city)}" target="_blank" style="color:#1677ff;font-weight:600">百度地图</a> for turn-by-turn directions in China.
         </div>`:''}
-        ${/korea|korean|seoul|busan|jeju|incheon/i.test(city+allDests)?`<div style="padding:.45rem .95rem;background:var(--sand);border-top:1px solid var(--border);font-size:.71rem;color:var(--ink-ll)">
+        ${isKorea?`<div style="padding:.45rem .95rem;background:var(--sand);border-top:1px solid var(--border);font-size:.71rem;color:var(--ink-ll)">
           💡 In South Korea, use <a href="https://map.kakao.com/?q=${encodeURIComponent(city)}" target="_blank" style="color:#f9b800;font-weight:600">카카오맵</a> or <a href="https://map.naver.com/v5/search/${encodeURIComponent(city)}" target="_blank" style="color:#03C75A;font-weight:600">네이버지도</a> for transit directions. T-money card works everywhere.
         </div>`:''}
       </div>`;
     });
-
-  const cardData=Object.entries(cityData)
-    .filter(([,d])=>d.hotel&&d.places.length);
 
   container.innerHTML=cardData.length
     ?`<div class="sec-hdr" style="margin-top:1.2rem">
@@ -3188,17 +3259,17 @@ function buildCityMaps(t){
       </div>`+cards.join('')
     :'';
 
-  // Render Leaflet maps after DOM is ready — pass city as context for geocoding
+  // Render Leaflet maps after DOM is ready — hotel pin + up to 4 attraction pins
   if(cardData.length){
     requestAnimationFrame(()=>{
-      cardData.forEach(([city,d])=>{
+      cardData.forEach(([,d])=>{
+        const city=d.displayCity||d.hotel.city||'';
         const leafletId=`lf-${d.hotelIdx}`;
-        // Pass up to 4 places; hotel name + city gives Nominatim enough context
         _buildLeafletMap(
           leafletId,
           d.places.slice(0,4),
-          d.hotel.name,  // hotel as anchor
-          city           // city context for all geocoding queries
+          d.hotel.name,
+          city
         );
       });
     });
@@ -3485,23 +3556,23 @@ function renderGuide(g){
           <div class="guide-grid">
             <div class="guide-item">
               <div class="guide-item-title">📱 Google Translate</div>
-              <div class="guide-item-val">Download offline language pack before travel — works without internet</div>
-              <div class="guide-item-sub"><a href="https://translate.google.com" target="_blank" style="color:var(--teal)">translate.google.com ↗</a> · iOS & Android</div>
+              <div class="guide-item-val">Download the offline language pack before travel — works without internet. Use <strong>Camera / Lens mode</strong> to point at menus, signs or labels for instant visual translation.</div>
+              <div class="guide-item-sub"><a href="https://translate.google.com" target="_blank" style="color:var(--teal)">translate.google.com ↗</a> · iOS & Android · Free</div>
             </div>
-            ${/korea|korean|seoul|busan|jeju/i.test(g.destination||'')?`<div class="guide-item">
-              <div class="guide-item-title">📱 Papago (Korea)</div>
-              <div class="guide-item-val">Naver's Korean-optimised translator — more accurate than Google for Korean</div>
+            ${/korea|korean|seoul|busan|jeju|japan|tokyo|osaka|kyoto|fukuoka|sapporo/i.test(g.destination||'')?`<div class="guide-item">
+              <div class="guide-item-title">📱 Papago</div>
+              <div class="guide-item-val">Naver's translator — significantly more accurate than Google for Korean and Japanese, especially for colloquial phrases and menus</div>
               <div class="guide-item-sub"><a href="https://papago.naver.com" target="_blank" style="color:var(--teal)">papago.naver.com ↗</a> · iOS & Android · Free</div>
             </div>`:''}
-            ${/japan|tokyo|osaka|kyoto/i.test(g.destination||'')?`<div class="guide-item">
-              <div class="guide-item-title">📱 DeepL / Google Lens</div>
-              <div class="guide-item-val">Point camera at Japanese text for instant translation — great for menus & signs</div>
-              <div class="guide-item-sub">Google Translate → Camera mode · <a href="https://deepl.com" target="_blank" style="color:var(--teal)">deepl.com ↗</a></div>
+            ${/japan|tokyo|osaka|kyoto|fukuoka|sapporo/i.test(g.destination||'')?`<div class="guide-item">
+              <div class="guide-item-title">📱 DeepL</div>
+              <div class="guide-item-val">Best-in-class Japanese ↔ English translation for longer text — pair with Google Lens camera mode for reading signs and restaurant menus on the spot</div>
+              <div class="guide-item-sub"><a href="https://deepl.com" target="_blank" style="color:var(--teal)">deepl.com ↗</a> · iOS & Android · Free tier available</div>
             </div>`:''}
-            ${/china|beijing|shanghai|guangzhou|chengdu/i.test(g.destination||'')?`<div class="guide-item">
-              <div class="guide-item-title">📱 Pleco (China)</div>
-              <div class="guide-item-val">Best Chinese dictionary app with handwriting input — essential for Mandarin characters</div>
-              <div class="guide-item-sub"><a href="https://pleco.com" target="_blank" style="color:var(--teal)">pleco.com ↗</a> · iOS & Android · Free base</div>
+            ${/china|beijing|shanghai|guangzhou|chengdu|shenzhen|hangzhou|suzhou|taipei|hong kong/i.test(g.destination||'')?`<div class="guide-item">
+              <div class="guide-item-title">📱 Pleco</div>
+              <div class="guide-item-val">Best Chinese dictionary with handwriting input and flashcard system — essential for reading Mandarin characters on menus and signs</div>
+              <div class="guide-item-sub"><a href="https://pleco.com" target="_blank" style="color:var(--teal)">pleco.com ↗</a> · iOS & Android · Free base app</div>
             </div>`:''}
           </div>
         </div>
@@ -4060,11 +4131,13 @@ function restoreForm(m,tripNameFallback){
       const row=document.createElement('div');
       row.className='dest-row';row.dataset.idx=idx;
       const isFirst=i===0;
-      row.innerHTML=`<input type="text" class="dest-input" placeholder="e.g. Tokyo, Japan" value="${d.replace(/"/g,'&quot;')}" oninput="onDestInput(${idx},this.value)">${isFirst?'':`<button class="dest-del" onclick="removeDest(this)">✕</button>`}`;
+      const nightsVal=m.nightsPerCity?.[i]||'';
+      row.innerHTML=`<input type="text" class="dest-input" placeholder="e.g. Tokyo, Japan" value="${d.replace(/"/g,'&quot;')}" oninput="onDestInput(${idx},this.value)"><div class="dest-nights-wrap" title="Nights in this city — leave blank and AI will decide the split"><input type="number" class="dest-nights" min="1" max="90" placeholder="?" value="${nightsVal}" oninput="updateNightsSummary()"><span class="dest-nights-lbl">nts</span></div>${isFirst?'':`<button class="dest-del" onclick="removeDest(this)">✕</button>`}`;
       list.appendChild(row);
       renderChips(idx,d);
     });
     updateDynamicSections();
+    updateNightsSummary();
   }
 }
 function delSaved(key){
@@ -5816,8 +5889,11 @@ function _hotelStayDates(city){
     // Fallback: use whole trip dates
     return {checkIn:tripData?._meta?.start||'',checkOut:tripData?._meta?.end||''};
   }
-  const checkIn=matches[0].date||'';
-  const lastDate=matches[matches.length-1].date||checkIn;
+  const metaStart=tripData?._meta?.start||'';
+  const firstDay=matches[0];
+  const lastDay=matches[matches.length-1];
+  const checkIn=firstDay.date||_addDays(metaStart,(firstDay.dayNumber||1)-1);
+  const lastDate=lastDay.date||_addDays(metaStart,(lastDay.dayNumber||1)-1);
   return {checkIn, checkOut:lastDate?_addDays(lastDate,1):''};
 }
 
@@ -5826,10 +5902,12 @@ function addActToGCal(di,ai){
   const day=tripData?.days?.[di];
   const a=day?.activities?.[ai];
   if(!day||!a){toast('⚠ Calendar export requires a generated trip (not demo)');return;}
-  if(!day.date){toast('⚠ No date on this day — check the itinerary');return;}
+  // Auto-compute date from dayNumber if AI omitted the date field
+  const dayDate=day.date||_addDays(tripData?._meta?.start||'',(day.dayNumber||di+1)-1);
+  if(!dayDate){toast('⚠ No date on this day — check the itinerary');return;}
 
-  const startDT=_gcalDT(day.date, a.time||'09:00');
-  const endDT  =_gcalDT(day.date, _addMins(a.time||'09:00', _parseDurMins(a.duration)));
+  const startDT=_gcalDT(dayDate, a.time||'09:00');
+  const endDT  =_gcalDT(dayDate, _addMins(a.time||'09:00', _parseDurMins(a.duration)));
 
   const details=[
     a.description||'',
@@ -5989,12 +6067,14 @@ function exportAllToGCal(){
   // ── 1. Every activity on every day (ALL types: attraction, restaurant,
   //       transport, hotel check-in, experience, shopping, airport, jetty…) ──
   (tripData.days||[]).forEach(day=>{
+    // Auto-compute date from dayNumber if AI omitted it
+    const dayDate=day.date||_addDays(meta.start,(day.dayNumber||1)-1);
     (day.activities||[]).forEach(a=>{
       const startTime=a.time||'09:00';
       const durMins=_parseDurMins(a.duration);
       const endTime=_addMins(startTime, durMins||60);
-      const startDT=_gcalDT(day.date,startTime);
-      const endDT  =_gcalDT(day.date,endTime);
+      const startDT=_gcalDT(dayDate,startTime);
+      const endDT  =_gcalDT(dayDate,endTime);
 
       let loc='';
       try{loc=new URL(a.googleMapsUrl||'').searchParams.get('query')||'';}catch(e){}
