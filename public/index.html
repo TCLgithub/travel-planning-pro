@@ -1368,15 +1368,18 @@ function goTab(t){
     $('tab-'+id)?.classList.toggle('active',id===t);
     $('panel-'+id)?.classList.toggle('active',id===t);
   });
-  // When switching to map tab, invalidate Leaflet size so tiles fill the container
+  // When switching to map tab, invalidate Leaflet size and re-fit bounds
   if(t==='map'){
     setTimeout(()=>{
       if(window._leafletMaps){
         Object.values(window._leafletMaps).forEach(m=>{
           try{m.invalidateSize();}catch(e){}
+          // Re-apply bounds saved by fitMarkers() — fitBounds() silently fails when
+          // the container is hidden, so we re-run it once the tab is visible
+          if(m._savedBounds){try{m.fitBounds(m._savedBounds);}catch(e){}}
         });
       }
-    },50);
+    },80);
   }
 }
 
@@ -2956,12 +2959,17 @@ function _buildLeafletMap(containerId, places, hotelName, city, drawRoute){
       if(seq!=null)orderedLatLngs[seq]=[lat,lng];
     }
     function fitMarkers(){
-      // Draw route polyline when requested (route overview map)
       if(drawRoute){
         const pts=orderedLatLngs.filter(Boolean);
-        if(pts.length>=2) L.polyline(pts,{color:'#1A6B6B',weight:3,opacity:.7,dashArray:'8,5'}).addTo(map);
+        // 'loop' = city map: close the route back to hotel (first point)
+        const allPts=(drawRoute==='loop'&&pts.length>=2)?[...pts,pts[0]]:pts;
+        if(allPts.length>=2) L.polyline(allPts,{color:'#1A6B6B',weight:3,opacity:.7,dashArray:'8,5'}).addTo(map);
       }
-      if(markers.length>=2){try{map.fitBounds(L.featureGroup(markers).getBounds().pad(0.25));}catch(e){}}
+      if(markers.length>=2){
+        const bounds=L.featureGroup(markers).getBounds().pad(0.25);
+        map._savedBounds=bounds; // persist for re-fit when tab becomes visible
+        try{map.fitBounds(bounds);}catch(e){}
+      }
       else if(markers.length===1){map.setView(markers[0].getLatLng(),14);}
     }
 
@@ -3212,10 +3220,22 @@ function buildCityMaps(t){
       const city=d.displayCity||h.city||'';  // original-case display name
       const isCN=CHINA_RE.test(city)||CHINA_RE.test(allDests);
       const country=isCN?', China':'';
-      const places=d.places.slice(0,4); // hard cap — fewer = better geocoding
+      const places=d.places.slice(0,4);
       const hotelQ=`${h.name}, ${city}${country}`;
 
-      // ── External links ──────────────────────────────────────────────
+      // ── Google Maps embed URL (saddr/daddr format — no API key required) ──
+      const gmEnc=s=>encodeURIComponent(s).replace(/%20/g,'+').replace(/%2C/g,',');
+      const gmCtx=city+country;
+      const gmOrigin=gmEnc(h.name+', '+gmCtx);
+      let gmEmbedSrc;
+      if(places.length){
+        const gmWps=[...places.map(p=>gmEnc(p.name+', '+gmCtx)),gmOrigin].join('+to:');
+        gmEmbedSrc=`https://maps.google.com/maps?saddr=${gmOrigin}&daddr=${gmWps}&output=embed&dirflg=w`;
+      }else{
+        gmEmbedSrc=`https://maps.google.com/maps?q=${gmOrigin}&output=embed`;
+      }
+
+      // ── External open-in-new-tab link ────────────────────────────────
       const wps=places.map(p=>esc(p.name+', '+city+country));
       const googleDirUrl=places.length
         ?`https://www.google.com/maps/dir/?api=1&origin=${esc(hotelQ)}&destination=${esc(hotelQ)}&waypoints=${wps.join('|')}&travelmode=walking`
@@ -3223,7 +3243,6 @@ function buildCityMaps(t){
       const amapUrl=`https://www.amap.com/dir?origin[name]=${encodeURIComponent(h.name)}&destination[name]=${encodeURIComponent((places[0]?.name||city)+', '+city)}&type=walk&src=travel-pro`;
 
       const mapCardId=`city-map-${d.hotelIdx}`;
-      const leafletId=`lf-${d.hotelIdx}`;
       const isKorea=/korea|korean|seoul|busan|jeju|incheon|daegu|daejeon|gwangju/i.test(city+allDests);
       return `
       <div class="map-card" id="${mapCardId}">
@@ -3240,9 +3259,7 @@ function buildCityMaps(t){
           ${places.map(p=>`<div class="wpt-seg">→</div><div class="wpt">${typeIcon[p.type]||'📍'} ${p.name}</div>`).join('')}
           ${places.length?`<div class="wpt-seg">→</div><div class="wpt" style="color:var(--ink-ll);font-size:.73rem">🏨 return</div>`:''}
         </div>
-        <div id="${leafletId}" style="height:280px;width:100%;background:var(--sand-d);display:flex;align-items:center;justify-content:center">
-          <div style="text-align:center;color:var(--ink-ll);font-size:.75rem"><div style="font-size:1.5rem;margin-bottom:.4rem">🗺</div>Loading map…</div>
-        </div>
+        <iframe src="${gmEmbedSrc}" style="height:300px;width:100%;border:none;display:block" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen title="Map — ${city}"></iframe>
         ${isCN?`<div style="padding:.45rem .95rem;background:var(--sand);border-top:1px solid var(--border);font-size:.71rem;color:var(--ink-ll)">
           💡 Use <a href="${amapUrl}" target="_blank" style="color:#1677ff;font-weight:600">高德地图 (Amap)</a> or <a href="https://map.baidu.com/search/${encodeURIComponent(city)}" target="_blank" style="color:#1677ff;font-weight:600">百度地图</a> for turn-by-turn directions in China.
         </div>`:''}
@@ -3255,25 +3272,9 @@ function buildCityMaps(t){
   container.innerHTML=cardData.length
     ?`<div class="sec-hdr" style="margin-top:1.2rem">
         <div class="sec-title">🏙 City Maps</div>
-        <div class="muted" style="font-size:.72rem">Interactive maps load below — pins appear as geocoding completes (~10s). Tap 🗺 Google Maps ↗ for turn-by-turn directions.</div>
+        <div class="muted" style="font-size:.72rem">Walking route: hotel → attractions → hotel. Tap 🗺 Google Maps ↗ for turn-by-turn directions.</div>
       </div>`+cards.join('')
     :'';
-
-  // Render Leaflet maps after DOM is ready — hotel pin + up to 4 attraction pins
-  if(cardData.length){
-    requestAnimationFrame(()=>{
-      cardData.forEach(([,d])=>{
-        const city=d.displayCity||d.hotel.city||'';
-        const leafletId=`lf-${d.hotelIdx}`;
-        _buildLeafletMap(
-          leafletId,
-          d.places.slice(0,4),
-          d.hotel.name,
-          city
-        );
-      });
-    });
-  }
 }
 
 function changeHotel(idx){
@@ -3487,15 +3488,100 @@ function buildDays(t,total){
 
 // ══ RENDER LOCAL GUIDE ══
 function renderGuide(g){
-  if(!g){return;}
+  const destStr=g?.destination||(tripData?.destinations||[]).join(', ')||tripData?.destination||'';
+  if(!g&&!tripData){return;}
   $('badge-guide').style.display='inline';
   $('empty-guide').style.display='none';
   const gc=$('guide-content');gc.style.display='block';
 
+  // No AI guide yet (demo or before generation) — show the three always-useful sections
+  if(!g){
+    gc.innerHTML=`
+    <div class="guide-panel">
+      <div class="guide-hdr">
+        <div class="guide-hdr-title">🗺 Local Guide${destStr?` — ${destStr}`:''}</div>
+        <div class="muted" style="color:rgba(240,200,122,.42);font-size:.61rem">Practical travel intel — generate your trip for full local guide</div>
+      </div>
+      <div class="guide-body">
+        <div class="guide-section">
+          <div class="guide-section-title">🌐 Translation Apps</div>
+          <div class="guide-grid">
+            <div class="guide-item">
+              <div class="guide-item-title">📱 Google Translate</div>
+              <div class="guide-item-val">Download the offline language pack before travel — works without internet. Use <strong>Camera / Lens mode</strong> to point at menus, signs or labels for instant visual translation.</div>
+              <div class="guide-item-sub"><a href="https://translate.google.com" target="_blank" style="color:var(--teal)">translate.google.com ↗</a> · iOS & Android · Free</div>
+            </div>
+            ${/korea|korean|seoul|busan|jeju|japan|tokyo|osaka|kyoto|fukuoka|sapporo/i.test(destStr)?`<div class="guide-item">
+              <div class="guide-item-title">📱 Papago</div>
+              <div class="guide-item-val">Naver's translator — significantly more accurate than Google for Korean and Japanese, especially for colloquial phrases and menus</div>
+              <div class="guide-item-sub"><a href="https://papago.naver.com" target="_blank" style="color:var(--teal)">papago.naver.com ↗</a> · iOS & Android · Free</div>
+            </div>`:''}
+            ${/japan|tokyo|osaka|kyoto|fukuoka|sapporo/i.test(destStr)?`<div class="guide-item">
+              <div class="guide-item-title">📱 DeepL</div>
+              <div class="guide-item-val">Best-in-class Japanese ↔ English translation for longer text — pair with Google Lens camera mode for reading signs and restaurant menus on the spot</div>
+              <div class="guide-item-sub"><a href="https://deepl.com" target="_blank" style="color:var(--teal)">deepl.com ↗</a> · iOS & Android · Free tier available</div>
+            </div>`:''}
+            ${/china|beijing|shanghai|guangzhou|chengdu|shenzhen|hangzhou|suzhou|taipei|hong kong/i.test(destStr)?`<div class="guide-item">
+              <div class="guide-item-title">📱 Pleco</div>
+              <div class="guide-item-val">Best Chinese dictionary with handwriting input and flashcard system — essential for reading Mandarin characters on menus and signs</div>
+              <div class="guide-item-sub"><a href="https://pleco.com" target="_blank" style="color:var(--teal)">pleco.com ↗</a> · iOS & Android · Free base app</div>
+            </div>`:''}
+          </div>
+        </div>
+        <div class="guide-section">
+          <div class="guide-section-title">🎫 Klook — Tickets & Experiences</div>
+          <div class="guide-grid">
+            <div class="guide-item">
+              <div class="guide-item-title">💡 Download Klook App</div>
+              <div class="guide-item-val">Book attraction tickets, day tours, transport passes and experiences — often 15–40% cheaper than at the gate. Instant mobile voucher, skip queues.</div>
+              <div class="guide-item-sub"><a href="https://www.klook.com" target="_blank" style="color:var(--teal)">klook.com ↗</a> · iOS & Android · Pay in MYR</div>
+            </div>
+            <div class="guide-item">
+              <div class="guide-item-title">🎟 What to book on Klook</div>
+              <div class="guide-item-val">Attraction passes · Airport transfers · Day tours · Train/bus tickets · SIM cards · Theme parks · Museum skip-the-line</div>
+              <div class="guide-item-sub">Compare with <a href="https://www.viator.com" target="_blank" style="color:var(--teal)">Viator ↗</a> for best price</div>
+            </div>
+          </div>
+        </div>
+        <div class="guide-section">
+          <div class="guide-section-title">💳 TNG eWallet & Alipay+ Overseas</div>
+          <div class="guide-grid">
+            <div class="guide-item">
+              <div class="guide-item-title">🇲🇾 Enable TNG for Alipay+</div>
+              <div class="guide-item-val">Touch 'n Go eWallet supports Alipay+ — pay at merchants in Korea, Japan, Thailand, Philippines, Taiwan & more using your TNG balance. No currency conversion fee.</div>
+              <div class="guide-item-sub">TNG App → Profile → Alipay+ → Enable · <a href="https://www.touchngo.com.my/alipay-plus" target="_blank" style="color:var(--teal)">Learn more ↗</a></div>
+            </div>
+            ${/korea|korean|seoul|busan|jeju/i.test(destStr)?`<div class="guide-item">
+              <div class="guide-item-title">🇰🇷 Korea — TNG via Alipay+</div>
+              <div class="guide-item-val">Scan Alipay QR codes at most convenience stores (GS25, CU, 7-Eleven), restaurants, and tourist spots. Works at Lotte/Shinsegae duty-free too.</div>
+              <div class="guide-item-sub">Look for the Alipay logo · No need for Korean Won cash at many spots</div>
+            </div>`:''}
+            ${/japan|tokyo|osaka|kyoto/i.test(destStr)?`<div class="guide-item">
+              <div class="guide-item-title">🇯🇵 Japan — TNG via Alipay+</div>
+              <div class="guide-item-val">Accepted at FamilyMart, Don Quijote, Matsumoto Kiyoshi, and many tourist attractions. Tap "Pay" and show QR.</div>
+              <div class="guide-item-sub">Also consider: <b>Wise card</b> for ATM withdrawals at Japanese post offices</div>
+            </div>`:''}
+            ${/thailand|bangkok|phuket|chiangmai|chiang mai/i.test(destStr)?`<div class="guide-item">
+              <div class="guide-item-title">🇹🇭 Thailand — TNG via Alipay+</div>
+              <div class="guide-item-val">Widely accepted at shopping malls, markets and hotel chains. PromptPay QR is Thai standard — use TNG to scan.</div>
+              <div class="guide-item-sub">Grab app in Thailand also accepts TNG/Alipay+ top-up via linked wallet</div>
+            </div>`:''}
+            <div class="guide-item">
+              <div class="guide-item-title">💡 Backup: Wise Travel Card</div>
+              <div class="guide-item-val">Load MYR, spend in local currency at near mid-market rates. Better than credit card foreign transaction fees.</div>
+              <div class="guide-item-sub"><a href="https://wise.com" target="_blank" style="color:var(--teal)">wise.com ↗</a> · Apply 2–3 weeks before travel</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+    return;
+  }
+
   gc.innerHTML=`
     <div class="guide-panel">
       <div class="guide-hdr">
-        <div class="guide-hdr-title">🗺 Local Guide — ${g.destination||''}</div>
+        <div class="guide-hdr-title">🗺 Local Guide — ${g.destination||destStr}</div>
         <div class="muted" style="color:rgba(240,200,122,.42);font-size:.61rem">Practical travel intelligence</div>
       </div>
       <div class="guide-body">
@@ -3559,17 +3645,17 @@ function renderGuide(g){
               <div class="guide-item-val">Download the offline language pack before travel — works without internet. Use <strong>Camera / Lens mode</strong> to point at menus, signs or labels for instant visual translation.</div>
               <div class="guide-item-sub"><a href="https://translate.google.com" target="_blank" style="color:var(--teal)">translate.google.com ↗</a> · iOS & Android · Free</div>
             </div>
-            ${/korea|korean|seoul|busan|jeju|japan|tokyo|osaka|kyoto|fukuoka|sapporo/i.test(g.destination||'')?`<div class="guide-item">
+            ${/korea|korean|seoul|busan|jeju|japan|tokyo|osaka|kyoto|fukuoka|sapporo/i.test(destStr)?`<div class="guide-item">
               <div class="guide-item-title">📱 Papago</div>
               <div class="guide-item-val">Naver's translator — significantly more accurate than Google for Korean and Japanese, especially for colloquial phrases and menus</div>
               <div class="guide-item-sub"><a href="https://papago.naver.com" target="_blank" style="color:var(--teal)">papago.naver.com ↗</a> · iOS & Android · Free</div>
             </div>`:''}
-            ${/japan|tokyo|osaka|kyoto|fukuoka|sapporo/i.test(g.destination||'')?`<div class="guide-item">
+            ${/japan|tokyo|osaka|kyoto|fukuoka|sapporo/i.test(destStr)?`<div class="guide-item">
               <div class="guide-item-title">📱 DeepL</div>
               <div class="guide-item-val">Best-in-class Japanese ↔ English translation for longer text — pair with Google Lens camera mode for reading signs and restaurant menus on the spot</div>
               <div class="guide-item-sub"><a href="https://deepl.com" target="_blank" style="color:var(--teal)">deepl.com ↗</a> · iOS & Android · Free tier available</div>
             </div>`:''}
-            ${/china|beijing|shanghai|guangzhou|chengdu|shenzhen|hangzhou|suzhou|taipei|hong kong/i.test(g.destination||'')?`<div class="guide-item">
+            ${/china|beijing|shanghai|guangzhou|chengdu|shenzhen|hangzhou|suzhou|taipei|hong kong/i.test(destStr)?`<div class="guide-item">
               <div class="guide-item-title">📱 Pleco</div>
               <div class="guide-item-val">Best Chinese dictionary with handwriting input and flashcard system — essential for reading Mandarin characters on menus and signs</div>
               <div class="guide-item-sub"><a href="https://pleco.com" target="_blank" style="color:var(--teal)">pleco.com ↗</a> · iOS & Android · Free base app</div>
@@ -3603,17 +3689,17 @@ function renderGuide(g){
               <div class="guide-item-val">Touch 'n Go eWallet supports Alipay+ — pay at merchants in Korea, Japan, Thailand, Philippines, Taiwan & more using your TNG balance. No currency conversion fee.</div>
               <div class="guide-item-sub">TNG App → Profile → Alipay+ → Enable · <a href="https://www.touchngo.com.my/alipay-plus" target="_blank" style="color:var(--teal)">Learn more ↗</a></div>
             </div>
-            ${/korea|korean|seoul|busan|jeju/i.test(g.destination||'')?`<div class="guide-item">
+            ${/korea|korean|seoul|busan|jeju/i.test(destStr)?`<div class="guide-item">
               <div class="guide-item-title">🇰🇷 Korea — TNG via Alipay+</div>
               <div class="guide-item-val">Scan Alipay QR codes at most convenience stores (GS25, CU, 7-Eleven), restaurants, and tourist spots. Works at Lotte/Shinsegae duty-free too.</div>
               <div class="guide-item-sub">Look for the Alipay logo · No need for Korean Won cash at many spots</div>
             </div>`:''}
-            ${/japan|tokyo|osaka|kyoto/i.test(g.destination||'')?`<div class="guide-item">
+            ${/japan|tokyo|osaka|kyoto/i.test(destStr)?`<div class="guide-item">
               <div class="guide-item-title">🇯🇵 Japan — TNG via Alipay+</div>
               <div class="guide-item-val">Accepted at FamilyMart, Don Quijote, Matsumoto Kiyoshi, and many tourist attractions. Tap "Pay" and show QR.</div>
               <div class="guide-item-sub">Also consider: <b>Wise card</b> for ATM withdrawals at Japanese post offices</div>
             </div>`:''}
-            ${/thailand|bangkok|phuket|chiangmai|chiang mai/i.test(g.destination||'')?`<div class="guide-item">
+            ${/thailand|bangkok|phuket|chiangmai|chiang mai/i.test(destStr)?`<div class="guide-item">
               <div class="guide-item-title">🇹🇭 Thailand — TNG via Alipay+</div>
               <div class="guide-item-val">Widely accepted at shopping malls, markets and hotel chains. PromptPay QR is Thai standard — use TNG to scan.</div>
               <div class="guide-item-sub">Grab app in Thailand also accepts TNG/Alipay+ top-up via linked wallet</div>
