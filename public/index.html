@@ -1920,7 +1920,14 @@ async function generateAll(){
   $('empty-itin-retry').style.display='none';
   startLoad();
 
-  // ── PART 1 PROMPT: itinerary only (lean — keeps response well under token limits) ──
+  const CHUNK=8; // days per API call — keeps output safely under token limits
+  const needsChunks=days>CHUNK;
+  const chunk1End=needsChunks?CHUNK:days;
+
+  // Helper: ISO date string for a given day number (1-based)
+  const dateOfDay=n=>_addDays(start,n-1);
+
+  // ── PART 1 PROMPT: itinerary header + first chunk of days ──
   const prompt=`You are a world-class travel planner. Create a ${days}-day travel itinerary.
 
 TRIP: ${name} | ${destStr} | ${start}→${end} | ${travellers} | From: ${homeCity} (${flightClass}) | Budget: ${budget} | Style: ${style} | Pace: ${pace} | Accom: ${accom} (${accomLoc}) | Transport: ${transport} | Diet: ${diet} | Food: ${food}${special?` | Special: ${special}`:''}${nightsStr?`\n${nightsStr}`:''}
@@ -1931,7 +1938,8 @@ FLIGHT TIME RULES:
 - Return >4h: last day = checkout + airport transfer only. Title "Departure Day".
 - Return ≤4h: light morning activities OK on last day.
 
-CRITICAL: Return ONLY valid JSON. No markdown, no code fences, no text outside JSON.
+CRITICAL: Return ONLY valid JSON. No markdown, no code fences, no text outside JSON.${needsChunks?`
+CHUNK INSTRUCTION: This trip is ${days} days. Generate ONLY days 1–${chunk1End} in the "days" array. Remaining days will be requested separately. Plan the full city/hotel allocation across all ${days} days so that later chunks stay consistent.`:''}
 
 {"tripName":"string","destinations":["string"],"summary":"2 sentence overview","totalBudgetEstimate":"MYR X–Y pp","flightTip":"1 sentence","currency":"CAD (Canadian Dollar)","language":"English","timezone":"PST/EST","waypoints":["City1","City2"],
 "transportSummary":[{"from":"A","to":"B","mode":"✈ Flight","duration":"5h","cost":"MYR 800","tip":"Book ahead"}],
@@ -1954,11 +1962,8 @@ CRITICAL: Return ONLY valid JSON. No markdown, no code fences, no text outside J
     const js=c.indexOf('{'),je=c.lastIndexOf('}');
     if(js<0||je<0)throw new Error('No JSON found in response');
     c=c.slice(js,je+1);
-    // Accept if direct parse yields a days array
     try{const p=JSON.parse(c);if(p.days?.length)return;}catch(e){}
-    // Accept if repaired parse yields a days array (handles truncated responses)
     try{const p=JSON.parse(repairJSON(c));if(p.days?.length)return;}catch(e){}
-    // Last resort: extract days array fragment and repair
     try{
       const dm=c.match(/"days"\s*:\s*(\[[\s\S]*)/);
       if(dm){const p=JSON.parse(repairJSON('{"days":'+dm[1]+'}'));if(p.days?.length)return;}
@@ -1966,9 +1971,45 @@ CRITICAL: Return ONLY valid JSON. No markdown, no code fences, no text outside J
     throw new Error('Response has no usable itinerary days — trying next provider');
   }
 
+  // Continuation validator: accepts {"days":[...]} with ≥1 entry
+  function validateContJSON(raw){
+    let c=raw.replace(/<think>[\s\S]*?<\/think>/gi,'').trim();
+    c=c.replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
+    // Accept bare array too
+    if(c.startsWith('[')){
+      try{const p=JSON.parse(c);if(Array.isArray(p)&&p.length)return;}catch(e){}
+      try{const p=JSON.parse(repairJSON(c));if(Array.isArray(p)&&p.length)return;}catch(e){}
+    }
+    const js=c.indexOf('{'),je=c.lastIndexOf('}');
+    if(js>=0&&je>=0){
+      c=c.slice(js,je+1);
+      try{const p=JSON.parse(c);if(p.days?.length)return;}catch(e){}
+      try{const p=JSON.parse(repairJSON(c));if(p.days?.length)return;}catch(e){}
+    }
+    throw new Error('No continuation days in response');
+  }
+
+  // Parse continuation response → array of day objects
+  function parseContinuationDays(raw){
+    let c=raw.replace(/<think>[\s\S]*?<\/think>/gi,'').trim();
+    c=c.replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
+    if(c.startsWith('[')){
+      try{const p=JSON.parse(c);if(Array.isArray(p))return p;}catch(e){}
+      try{const p=JSON.parse(repairJSON(c));if(Array.isArray(p))return p;}catch(e){}
+    }
+    const js=c.indexOf('{'),je=c.lastIndexOf('}');
+    if(js>=0&&je>=0){
+      c=c.slice(js,je+1);
+      try{const p=JSON.parse(c);if(p.days)return p.days;}catch(e){}
+      try{const p=JSON.parse(repairJSON(c));if(p.days)return p.days;}catch(e){}
+    }
+    return [];
+  }
+
   try{
+    // ── Chunk 1: full header + days 1–chunk1End ──
+    if(needsChunks)toast(`⏳ Generating days 1–${chunk1End} of ${days}…`,8000);
     const{text,provider,model}=await callWithFallback(prompt,validateItinJSON);
-    // Strip <think>…</think> blocks (deepseek-reasoner emits these before the JSON)
     let clean=text.replace(/<think>[\s\S]*?<\/think>/gi,'').trim();
     clean=clean.replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
     const js=clean.indexOf('{'),je=clean.lastIndexOf('}');
@@ -1980,6 +2021,37 @@ CRITICAL: Return ONLY valid JSON. No markdown, no code fences, no text outside J
       try{t=JSON.parse(repairJSON(clean));}
       catch(pe2){throw new Error('JSON parse failed — response may be truncated. Try again. ('+pe.message+')');}
     }
+
+    // ── Chunks 2…N: continuation days ──
+    if(needsChunks){
+      const hotelCtx=(t.hotels||[]).map(h=>`${h.city}: ${h.name}`).join(' | ');
+      const lastDay=t.days?.[t.days.length-1];
+      let prevCity=lastDay?.city||dests[0]?.split(',')[0]||'';
+
+      for(let from=chunk1End+1;from<=days;from+=CHUNK){
+        const to=Math.min(from+CHUNK-1,days);
+        toast(`⏳ Generating days ${from}–${to} of ${days}…`,8000);
+        const contPrompt=`Continue a ${days}-day travel itinerary for "${name}".
+
+TRIP: ${destStr} | ${start}→${end} | ${travellers} | Budget: ${budget} | Style: ${style} | Pace: ${pace} | Transport: ${transport} | Diet: ${diet} | Food: ${food}${nightsStr?`\n${nightsStr}`:''}
+Hotels: ${hotelCtx}
+Previous day ended in: ${prevCity}
+
+Generate ONLY days ${from} through ${to}. Day ${from} date = ${dateOfDay(from)}, Day ${to} date = ${dateOfDay(to)}.
+Continue logically from day ${from-1}. Keep same pace, style and hotel sequence.
+
+CRITICAL: Return ONLY valid JSON — no markdown, no text outside JSON.
+{"days":[{"dayNumber":${from},"date":"${dateOfDay(from)}","title":"string","theme":"emoji Theme","city":"string","activities":[{"time":"09:00","name":"string",${isChinese?'"nameZh":"中文",':''}"description":"One sentence.","type":"attraction","emoji":"🏔","transport":"...","googleMapsUrl":"https://www.google.com/maps/search/?api=1&query=place","estimatedCost":"MYR 20","duration":"2h"}]}]}`;
+
+        const{text:ct}=await callWithFallback(contPrompt,validateContJSON);
+        const moreDays=parseContinuationDays(ct);
+        if(moreDays.length){
+          t.days=[...(t.days||[]),...moreDays];
+          prevCity=moreDays[moreDays.length-1]?.city||prevCity;
+        }
+      }
+    }
+
     tripData={...t,_meta:{start,end,days,travellers,homeCity,flightClass,provider,model,dests,
       tripName:name,budget,style,accom,accomLoc,transport,diet,food,pace,special,nightsPerCity}};
     saveTrip(tripData);
@@ -1989,7 +2061,8 @@ CRITICAL: Return ONLY valid JSON. No markdown, no code fences, no text outside J
     setTimeout(()=>generateGuideAndBudget(tripData).catch(()=>{}),600);
     setTimeout(()=>generateWeather(tripData).catch(()=>{}),1200);
     setTimeout(()=>generatePackingList(tripData).catch(()=>{}),2200);
-    toast('✓ Itinerary ready! Guide & Budget loading… (via '+P_LABELS[provider]+')');
+    const dayCount=tripData.days?.length||days;
+    toast(`✓ ${dayCount}-day itinerary ready! Guide & Budget loading… (via ${P_LABELS[provider]})`);
   }catch(err){
     console.error(err);
     // Show persistent error on the itinerary empty state so user can read it
