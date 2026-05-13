@@ -1968,11 +1968,12 @@ Return ONLY valid JSON — no markdown, no code fences, nothing outside JSON:
     "localTransport":[{"type":"Subway/CTrain","tip":"Get a reloadable transit card","cost":"CAD 3.60 per ride"}],
     "apps":{"eWallet":[],"eHailing":[{"name":"Uber","note":"Main ride-hailing app"}],"food":[{"name":"DoorDash","note":"Food delivery"}],"maps":[{"name":"Google Maps","note":"Download offline maps"}],"other":[]},
     /* IMPORTANT — auto-select correct apps by destination:
-       Korea → eHailing: KakaoTaxi, maps: KakaoMap + Naver Map, eWallet: Kakao Pay / Naver Pay, food: Baemin / Coupang Eats
-       Japan → eHailing: GO/Uber Japan, maps: Google Maps + Navitime, eWallet: Suica / IC Card, food: Uber Eats / Demae-can
+       Korea → eHailing: KakaoTaxi, maps: KakaoMap + Naver Map, eWallet: Kakao Pay / Naver Pay / TNG Alipay+, food: Baemin / Coupang Eats
+       Japan → eHailing: GO/Uber Japan, maps: Google Maps + Navitime, eWallet: Suica / IC Card / TNG Alipay+, food: Uber Eats / Demae-can
        China → eHailing: DiDi, maps: Amap (高德) + Baidu Maps, eWallet: Alipay + WeChat Pay, food: Meituan / Eleme
-       Thailand → eHailing: Grab, maps: Google Maps, eWallet: TrueMoney / PromptPay
-       Singapore/Malaysia → eHailing: Grab, maps: Google Maps, eWallet: GrabPay/Touch n Go
+       Thailand → eHailing: Grab, maps: Google Maps, eWallet: TrueMoney / PromptPay / TNG Alipay+
+       Singapore/Malaysia → eHailing: Grab, maps: Google Maps, eWallet: GrabPay / Touch n Go
+       Always add Google Translate to other.apps. Add Papago if Korea or Japan. Add Klook to other.apps for any Asian destination.
        Populate only relevant categories for the actual destination. Leave empty arrays for irrelevant categories. */
     "essentialPhrases":[{"en":"Thank you","local":"Thank you / Merci","pronunciation":"mer-SEE (in Quebec)"}],
     "customs":[{"title":"Tipping","detail":"15–20% in restaurants; 10–15% for taxis"}],
@@ -2810,23 +2811,47 @@ function _buildLeafletMap(containerId, places, hotelName, city){
   if(!container)return;
 
   const mapId='lf-'+containerId.replace(/[^a-zA-Z0-9]/g,'_');
-  container.style.height='280px';
+  container.style.height=container.style.height||'280px';
+  // Wipe and recreate inner div — cleanest way to avoid Leaflet re-init errors
   container.innerHTML=`<div id="${mapId}" style="height:100%;width:100%;min-height:260px;z-index:0;border-radius:inherit"></div>`;
 
   function buildQueryName(name,cityCtx){
-    // Use name alone if it already contains a comma (has location context)
     if(!name)return cityCtx||'';
     if(name.includes(','))return name;
     return cityCtx ? `${name}, ${cityCtx}` : name;
   }
 
+  // Resolve coords from built-in DB — handles "Vancouver", "Vancouver, Canada", etc.
+  function resolveCityCoords(str){
+    if(!str)return null;
+    const k=str.toLowerCase().trim();
+    if(CITY_COORDS[k])return CITY_COORDS[k];
+    const base=k.split(',')[0].trim();
+    if(CITY_COORDS[base])return CITY_COORDS[base];
+    for(const[ck,cv] of Object.entries(CITY_COORDS)){
+      if(k.includes(ck)||ck.includes(base))return cv;
+    }
+    return null;
+  }
+
   function initLeafletMap(){
     const L=window.L;
     if(!L){setTimeout(initLeafletMap,300);return;}
-    // Destroy existing map instance if any
     const el=document.getElementById(mapId);
     if(!el)return;
-    if(el._leaflet_id)try{L.map(el).remove();}catch(e){}
+    // Safe destroy: Leaflet stores map instances internally keyed by _leaflet_id
+    if(el._leaflet_id){
+      try{
+        // Access Leaflet's internal map registry
+        const existing=L.map(el);// this throws if already initialised — catch it
+        existing.remove();
+      }catch(e){
+        // Already removed or can't get ref — just reset the innerHTML again
+        el.innerHTML='';
+        el.removeAttribute('data-leaflet');
+        delete el._leaflet_id;
+      }
+    }
 
     const map=L.map(mapId,{zoomControl:true,scrollWheelZoom:false,attributionControl:true});
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
@@ -2834,17 +2859,10 @@ function _buildLeafletMap(containerId, places, hotelName, city){
       maxZoom:19
     }).addTo(map);
 
-    // Set an initial view so map renders even before geocoding
-    map.setView([20,100],3);
+    // Set initial view immediately from built-in DB — no async needed
+    const cityCoord=resolveCityCoords(city)||resolveCityCoords(hotelName);
+    map.setView(cityCoord||[20,0], cityCoord?12:2);
 
-    // Geocode city centre first for initial view
-    const cityKey=(city||'').toLowerCase().trim();
-    const cityCoord=CITY_COORDS[cityKey]||Object.entries(CITY_COORDS).find(([k])=>cityKey.includes(k)||k.includes(cityKey.split(',')[0].trim()))?.[1];
-    if(cityCoord)map.setView(cityCoord,12);
-
-    // Items to geocode: hotel first, then places
-
-    // Items to geocode: hotel first, then places
     const toGeocode=[];
     if(hotelName)toGeocode.push({q:buildQueryName(hotelName,city),isHotel:true,label:hotelName.split(',')[0]});
     places.forEach(p=>{
@@ -2852,79 +2870,60 @@ function _buildLeafletMap(containerId, places, hotelName, city){
     });
 
     if(!toGeocode.length){
-      // No places — just show the city
-      if(city){
-        geocodeCity(city).then(g=>{if(g)map.setView([g.lat,g.lon],12);}).catch(()=>{});
-      }
+      if(city)geocodeCity(city).then(g=>{if(g)map.setView([g.lat,g.lon],12);}).catch(()=>{});
       return;
     }
 
     const markers=[];
-    const hotelIcon=L.divIcon({html:'<div style="background:#C4862B;color:white;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-size:15px;box-shadow:0 2px 8px rgba(0,0,0,.4);border:2px solid white">🏨</div>',iconSize:[30,30],iconAnchor:[15,15],className:''});
+    const hotelIcon=L.divIcon({html:'<div style="background:#C4862B;color:white;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 8px rgba(0,0,0,.4);border:2px solid white">🏨</div>',iconSize:[30,30],iconAnchor:[15,15],className:''});
     const placeIcon=t=>L.divIcon({html:`<div style="background:#1A6B6B;color:white;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:13px;box-shadow:0 2px 6px rgba(0,0,0,.35);border:2px solid white">${{attraction:'📍',restaurant:'🍽',shopping:'🛍',experience:'🎯',transport:'🚉'}[t]||'📍'}</div>`,iconSize:[26,26],iconAnchor:[13,13],className:''});
+
+    function placeMarker(lat,lng,item){
+      const icon=item.isHotel?hotelIcon:placeIcon(item.type);
+      const m=L.marker([lat,lng],{icon}).addTo(map);
+      m.bindPopup(`<strong>${item.label}</strong>`);
+      markers.push(m);
+    }
+    function fitMarkers(){
+      if(markers.length>=2){try{map.fitBounds(L.featureGroup(markers).getBounds().pad(0.2));}catch(e){}}
+      else if(markers.length===1){map.setView(markers[0].getLatLng(),14);}
+    }
 
     let idx=0;
     function next(){
-      if(idx>=toGeocode.length){
-        if(markers.length>=2){
-          try{map.fitBounds(L.featureGroup(markers).getBounds().pad(0.2));}catch(e){}
-        } else if(markers.length===1){
-          map.setView(markers[0].getLatLng(),14);
-        }
-        return;
-      }
+      if(idx>=toGeocode.length){fitMarkers();return;}
       const item=toGeocode[idx++];
-
-      // Try built-in DB first (instant, no network)
-      const qLow=item.q.toLowerCase();
-      let coords=CITY_COORDS[qLow];
-      if(!coords){
-        // Partial match
-        const found=Object.entries(CITY_COORDS).find(([k])=>qLow.includes(k)||k.includes(qLow.split(',')[0].trim()));
-        if(found)coords=found[1];
-      }
-
-      function placeMarker(lat,lng){
-        const icon=item.isHotel?hotelIcon:placeIcon(item.type);
-        const m=L.marker([lat,lng],{icon}).addTo(map);
-        m.bindPopup(`<strong>${item.label}</strong>`);
-        markers.push(m);
-      }
-
-      if(coords){
-        placeMarker(coords[0],coords[1]);
-        setTimeout(next,50); // No network delay needed
-      } else {
-        // Fallback: Photon API (CORS-friendly, no key required)
-        fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(item.q)}&limit=1&lang=en`)
-          .then(r=>r.json())
-          .then(data=>{
-            const f=data?.features?.[0];
-            if(f){const[lng,lat]=f.geometry.coordinates;placeMarker(lat,lng);}
-          })
-          .catch(()=>{})
-          .finally(()=>setTimeout(next,400));
-      }
+      // 1. Built-in DB (instant)
+      const coords=resolveCityCoords(item.label)||resolveCityCoords(item.q);
+      if(coords){placeMarker(coords[0],coords[1],item);setTimeout(next,30);return;}
+      // 2. Photon fallback (CORS-friendly, no key)
+      fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(item.q)}&limit=1&lang=en`)
+        .then(r=>r.json())
+        .then(data=>{
+          const f=data?.features?.[0];
+          if(f){const[lng,lat]=f.geometry.coordinates;placeMarker(lat,lng,item);}
+        })
+        .catch(()=>{})
+        .finally(()=>setTimeout(next,400));
     }
     next();
   }
 
   if(!window.L){
     if(!document.getElementById('leaflet-css')){
-      const link=document.createElement('link');
-      link.id='leaflet-css';link.rel='stylesheet';
-      link.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-      document.head.appendChild(link);
+      const lnk=document.createElement('link');
+      lnk.id='leaflet-css';lnk.rel='stylesheet';
+      lnk.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(lnk);
     }
     if(!document.getElementById('leaflet-js')){
-      const script=document.createElement('script');
-      script.id='leaflet-js';
-      script.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-      script.onload=initLeafletMap;
-      document.head.appendChild(script);
+      const scr=document.createElement('script');
+      scr.id='leaflet-js';
+      scr.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      scr.onload=()=>setTimeout(initLeafletMap,50);
+      document.head.appendChild(scr);
     } else {
-      // Script tag exists but may still be loading
-      setTimeout(initLeafletMap,500);
+      setTimeout(initLeafletMap,window.L?0:800);
     }
   } else {
     initLeafletMap();
@@ -3469,6 +3468,82 @@ function renderGuide(g){
             }
             return rows.length?`<div style="margin-top:.45rem">${rows.join('')}</div>`:'';
           })()}
+        </div>
+
+        <!-- ── Translator Apps ── -->
+        <div class="guide-section">
+          <div class="guide-section-title">🌐 Translation Apps</div>
+          <div class="guide-grid">
+            <div class="guide-item">
+              <div class="guide-item-title">📱 Google Translate</div>
+              <div class="guide-item-val">Download offline language pack before travel — works without internet</div>
+              <div class="guide-item-sub"><a href="https://translate.google.com" target="_blank" style="color:var(--teal)">translate.google.com ↗</a> · iOS & Android</div>
+            </div>
+            ${/korea|korean|seoul|busan|jeju/i.test(g.destination||'')?`<div class="guide-item">
+              <div class="guide-item-title">📱 Papago (Korea)</div>
+              <div class="guide-item-val">Naver's Korean-optimised translator — more accurate than Google for Korean</div>
+              <div class="guide-item-sub"><a href="https://papago.naver.com" target="_blank" style="color:var(--teal)">papago.naver.com ↗</a> · iOS & Android · Free</div>
+            </div>`:''}
+            ${/japan|tokyo|osaka|kyoto/i.test(g.destination||'')?`<div class="guide-item">
+              <div class="guide-item-title">📱 DeepL / Google Lens</div>
+              <div class="guide-item-val">Point camera at Japanese text for instant translation — great for menus & signs</div>
+              <div class="guide-item-sub">Google Translate → Camera mode · <a href="https://deepl.com" target="_blank" style="color:var(--teal)">deepl.com ↗</a></div>
+            </div>`:''}
+            ${/china|beijing|shanghai|guangzhou|chengdu/i.test(g.destination||'')?`<div class="guide-item">
+              <div class="guide-item-title">📱 Pleco (China)</div>
+              <div class="guide-item-val">Best Chinese dictionary app with handwriting input — essential for Mandarin characters</div>
+              <div class="guide-item-sub"><a href="https://pleco.com" target="_blank" style="color:var(--teal)">pleco.com ↗</a> · iOS & Android · Free base</div>
+            </div>`:''}
+          </div>
+        </div>
+
+        <!-- ── Klook Tickets ── -->
+        <div class="guide-section">
+          <div class="guide-section-title">🎫 Klook — Tickets & Experiences</div>
+          <div class="guide-grid">
+            <div class="guide-item">
+              <div class="guide-item-title">💡 Download Klook App</div>
+              <div class="guide-item-val">Book attraction tickets, day tours, transport passes and experiences — often 15–40% cheaper than at the gate. Instant mobile voucher, skip queues.</div>
+              <div class="guide-item-sub"><a href="https://www.klook.com" target="_blank" style="color:var(--teal)">klook.com ↗</a> · iOS & Android · Pay in MYR</div>
+            </div>
+            <div class="guide-item">
+              <div class="guide-item-title">🎟 What to book on Klook</div>
+              <div class="guide-item-val">Attraction passes · Airport transfers · Day tours · Train/bus tickets · SIM cards · Theme parks · Museum skip-the-line</div>
+              <div class="guide-item-sub">Compare with <a href="https://www.viator.com" target="_blank" style="color:var(--teal)">Viator ↗</a> for best price</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── TNG / Alipay+ Payments ── -->
+        <div class="guide-section">
+          <div class="guide-section-title">💳 TNG eWallet & Alipay+ Overseas</div>
+          <div class="guide-grid">
+            <div class="guide-item">
+              <div class="guide-item-title">🇲🇾 Enable TNG for Alipay+</div>
+              <div class="guide-item-val">Touch 'n Go eWallet supports Alipay+ — pay at merchants in Korea, Japan, Thailand, Philippines, Taiwan & more using your TNG balance. No currency conversion fee.</div>
+              <div class="guide-item-sub">TNG App → Profile → Alipay+ → Enable · <a href="https://www.touchngo.com.my/alipay-plus" target="_blank" style="color:var(--teal)">Learn more ↗</a></div>
+            </div>
+            ${/korea|korean|seoul|busan|jeju/i.test(g.destination||'')?`<div class="guide-item">
+              <div class="guide-item-title">🇰🇷 Korea — TNG via Alipay+</div>
+              <div class="guide-item-val">Scan Alipay QR codes at most convenience stores (GS25, CU, 7-Eleven), restaurants, and tourist spots. Works at Lotte/Shinsegae duty-free too.</div>
+              <div class="guide-item-sub">Look for the Alipay logo · No need for Korean Won cash at many spots</div>
+            </div>`:''}
+            ${/japan|tokyo|osaka|kyoto/i.test(g.destination||'')?`<div class="guide-item">
+              <div class="guide-item-title">🇯🇵 Japan — TNG via Alipay+</div>
+              <div class="guide-item-val">Accepted at FamilyMart, Don Quijote, Matsumoto Kiyoshi, and many tourist attractions. Tap "Pay" and show QR.</div>
+              <div class="guide-item-sub">Also consider: <b>Wise card</b> for ATM withdrawals at Japanese post offices</div>
+            </div>`:''}
+            ${/thailand|bangkok|phuket|chiangmai|chiang mai/i.test(g.destination||'')?`<div class="guide-item">
+              <div class="guide-item-title">🇹🇭 Thailand — TNG via Alipay+</div>
+              <div class="guide-item-val">Widely accepted at shopping malls, markets and hotel chains. PromptPay QR is Thai standard — use TNG to scan.</div>
+              <div class="guide-item-sub">Grab app in Thailand also accepts TNG/Alipay+ top-up via linked wallet</div>
+            </div>`:''}
+            <div class="guide-item">
+              <div class="guide-item-title">💡 Backup: Wise Travel Card</div>
+              <div class="guide-item-val">Load MYR, spend in local currency at near mid-market rates. Better than credit card foreign transaction fees.</div>
+              <div class="guide-item-sub"><a href="https://wise.com" target="_blank" style="color:var(--teal)">wise.com ↗</a> · Apply 2–3 weeks before travel</div>
+            </div>
+          </div>
         </div>
 
         <div class="guide-section">
@@ -5700,19 +5775,23 @@ function _addMins(t,mins){
 }
 // "YYYY-MM-DD" + "HH:MM" → "YYYYMMDDTHHmm00" (local time, no Z)
 function _gcalDT(date,time){
-  if(!date)return '';
-  const d=(date||'').replace(/-/g,'');
+  if(!date||!/^\d{4}-\d{2}-\d{2}$/.test(date))return '';
+  const d=date.replace(/-/g,'');
   const[hh,mm]=(time||'09:00').split(':');
   return `${d}T${(hh||'09').padStart(2,'0')}${(mm||'00').padStart(2,'0')}00`;
 }
 // "YYYY-MM-DD" → "YYYYMMDD" (all-day)
-function _gcalD(date){ return (date||'').replace(/-/g,''); }
+function _gcalD(date){
+  if(!date||!/^\d{4}-\d{2}-\d{2}$/.test(date))return '';
+  return date.replace(/-/g,'');
+}
 
 // Add N days to a YYYY-MM-DD string safely (UTC to avoid DST shifts)
 function _addDays(dateStr,n){
-  if(!dateStr)return '';
+  if(!dateStr||!/^\d{4}-\d{2}-\d{2}$/.test(dateStr))return dateStr||'';
   const[y,mo,d]=(dateStr).split('-').map(Number);
   const dt=new Date(Date.UTC(y,mo-1,d+n));
+  if(isNaN(dt.getTime()))return dateStr;
   return dt.toISOString().slice(0,10);
 }
 
@@ -6005,21 +6084,27 @@ function exportAllToGCal(){
   if(!vEvents.length){ toast('⚠ No events found to export'); return; }
 
   // ── Assemble ICS ──────────────────────────────────────────────────────
-  const calName=_icsEsc(tripData.tripName||'My Trip');
   const CRLF='\r\n';
+  // Filter out any empty strings from _vEvent returning '' on bad dates
+  const validEvents=vEvents.filter(e=>e&&e.includes('BEGIN:VEVENT'));
 
-  // Optional VTIMEZONE block (helps Outlook and Apple Calendar)
+  if(!validEvents.length){ toast('⚠ No valid dated events to export — check trip has dates set'); return; }
+
+  const calName=_icsEsc(tripData.tripName||'My Trip');
+
   const tzBlock=tz?[
     'BEGIN:VTIMEZONE',
     _icsLine('TZID',tz),
     'BEGIN:STANDARD',
-    'TZOFFSETFROM:+0000',
-    'TZOFFSETTO:+0000',
+    'TZOFFSETFROM:+0800','TZOFFSETTO:+0800',
     'TZNAME:'+tz.split('/').pop(),
     'END:STANDARD',
     'END:VTIMEZONE'
   ].join(CRLF):'';
 
+  // Each VEVENT block must be separated by CRLF from the surrounding lines
+  // The vEvents array items already contain internal CRLFs
+  // We join the outer array with CRLF so blocks flow correctly
   const icsLines=[
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
@@ -6030,14 +6115,13 @@ function exportAllToGCal(){
     _icsLine('X-WR-CALNAME',calName),
     tz?_icsLine('X-WR-TIMEZONE',tz):'',
     tzBlock,
-    ...vEvents,
+    ...validEvents,
     'END:VCALENDAR'
   ].filter(Boolean);
 
   const ics=icsLines.join(CRLF);
 
   // ── Download ──────────────────────────────────────────────────────────
-  // No BOM — it confuses some calendar clients (Outlook, Thunderbird)
   const blob=new Blob([ics],{type:'text/calendar;charset=utf-8'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
@@ -6053,7 +6137,7 @@ function exportAllToGCal(){
   const segCount=(tripData.transportSummary||[]).length;
   const htlCount=(tripData.hotels||[]).length;
 
-  _showCalShareModal(safeName, actCount, segCount, htlCount, vEvents.length);
+  _showCalShareModal(safeName, actCount, segCount, htlCount, validEvents.length);
 }
 
 function _showCalShareModal(safeName, actCount, segCount, htlCount, total){
