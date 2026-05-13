@@ -3921,7 +3921,7 @@ function openOnlineShareModal(){
 }
 function closeOnlineShareModal(){$('online-share-modal').classList.remove('open');}
 
-let _osmCode='';
+let _osmCode='',_osmUrl='';
 async function publishOnline(){
   const pw=$('osm-pw').value.trim();
   const pw2=$('osm-pw2').value.trim();
@@ -3937,20 +3937,21 @@ async function publishOnline(){
     btn.textContent='⏳ Uploading…';
     const binId=await _jsonbinCreate(enc,tripData.tripName?.slice(0,48)||'trip');
     _osmCode=binId;
+    _osmUrl=location.origin+location.pathname+'?code='+binId;
     $('osm-code').textContent=binId;
+    const urlEl=$('osm-url-display');if(urlEl)urlEl.value=_osmUrl;
     $('osm-step-upload').style.display='none';
     $('osm-step-done').style.display='block';
-    toast('✅ Trip published! Share code: '+binId);
+    toast('✅ Published! Copy the link and send the password separately.');
   }catch(e){
     errEl.textContent='Error: '+e.message;errEl.style.display='block';
     toast('❌ '+e.message,5000);
   }finally{btn.textContent='☁ Encrypt & Publish';btn.disabled=false;}
 }
-function copyOsmCode(){
-  navigator.clipboard.writeText(_osmCode).then(()=>toast('✓ Code copied!'));
-}
-function shareOsmWA(){window.open('https://wa.me/?text='+esc('Your share code for the trip plan:\n\nCode: '+_osmCode+'\n\nPassword: [send separately]\n\nOpen in Travel Planning Pro → 📥 Load Trip'));}
-function shareOsmEmail(){window.open('mailto:?subject='+esc('Travel Plan Share Code')+'&body='+esc('Here is your share code for the trip plan:\n\nCode: '+_osmCode+'\n\nI will send the password separately.\n\nOpen Travel Planning Pro and click 📥 Load Trip to enter the code and password.'));}
+function copyOsmCode(){navigator.clipboard.writeText(_osmCode).then(()=>toast('✓ Code copied!'));}
+function copyOsmUrl(){navigator.clipboard.writeText(_osmUrl).then(()=>toast('✓ Link copied! Send password separately.'));}
+function shareOsmWA(){window.open('https://wa.me/?text='+esc('📍 '+(tripData?.tripName||'My Trip')+' — trip plan ready!\n\nOpen this link:\n'+_osmUrl+'\n\nEnter the password I\'ll send you separately to view the full plan.'));}
+function shareOsmEmail(){window.open('mailto:?subject='+esc('Trip Plan: '+(tripData?.tripName||'My Trip'))+'&body='+esc('Your trip plan is ready!\n\nOpen this link:\n'+_osmUrl+'\n\nI\'ll send you the password separately.\n\nJust open the link, enter the password, and you\'ll see the full itinerary.'));}
 
 // ══ LOAD BY CODE ══
 function openLoadCodeModal(){
@@ -4468,7 +4469,14 @@ window.addEventListener('DOMContentLoaded',()=>{
   loadAllKeys();
   loadJsonbinKey();
   loadGcalEmail();
-  loadFromURL().then(loaded=>{if(!loaded)loadDemo();});
+  // ?code= param → shared trip via ☁ Online: pre-fill code and open password modal
+  const _sharedCode=new URLSearchParams(location.search).get('code');
+  if(_sharedCode){
+    if($('lcm-code'))$('lcm-code').value=_sharedCode;
+    openLoadCodeModal();
+  } else {
+    loadFromURL().then(loaded=>{if(!loaded)loadDemo();});
+  }
 
   // ── Netlify proxy mode UI ──
   if(NETLIFY_MODE){
@@ -6655,18 +6663,22 @@ Return the complete updated trip plan with this exact structure:
     </div>
 
     <div id="osm-step-done" style="display:none">
-      <div class="modal-sub" style="margin-bottom:.45rem">✅ Trip published! Share the code + password <em>separately</em> with your friend.</div>
-      <label style="color:var(--ink-ll);font-size:.62rem;letter-spacing:.08em;text-transform:uppercase">Share Code</label>
+      <div class="modal-sub" style="margin-bottom:.55rem">✅ Published! Send your friend the <strong>link</strong> below — they just open it and enter the password.</div>
+      <label style="color:var(--ink-ll);font-size:.62rem;letter-spacing:.08em;text-transform:uppercase">Share Link (send this)</label>
+      <div style="display:flex;gap:.35rem;margin-bottom:.55rem;align-items:center">
+        <input type="text" id="osm-url-display" readonly style="font-size:.68rem;font-family:monospace;background:var(--sand-d);border:1px solid var(--border);color:var(--ink);padding:.32rem .5rem;border-radius:4px;flex:1;margin:0">
+        <button class="btn btn-primary btn-sm" onclick="copyOsmUrl()" style="flex-shrink:0">📋 Copy Link</button>
+      </div>
+      <label style="color:var(--ink-ll);font-size:.62rem;letter-spacing:.08em;text-transform:uppercase">Share Code (alternative)</label>
       <div class="modal-code-box" id="osm-code" onclick="copyOsmCode()" title="Click to copy">—</div>
-      <div class="modal-actions" style="justify-content:space-between;align-items:center">
+      <div class="modal-actions" style="justify-content:space-between;align-items:center;margin-top:.55rem">
         <div style="display:flex;gap:.35rem;flex-wrap:wrap">
-          <button class="btn btn-ghost btn-sm" onclick="copyOsmCode()">📋 Copy Code</button>
           <button class="btn btn-ghost btn-sm" onclick="shareOsmWA()">💬 WhatsApp</button>
           <button class="btn btn-ghost btn-sm" onclick="shareOsmEmail()">✉ Email</button>
         </div>
         <button class="btn btn-primary btn-sm" onclick="closeOnlineShareModal()">Done</button>
       </div>
-      <div style="font-size:.63rem;color:var(--ink-ll);margin-top:.55rem;line-height:1.55">Code valid ~180 days (JSONBin free tier). Friend needs <strong>both</strong> the code <em>and</em> password — share them through different channels for security.</div>
+      <div style="font-size:.63rem;color:var(--ink-ll);margin-top:.55rem;line-height:1.55">⚠ Send the <strong>password separately</strong> (e.g. via WhatsApp voice, SMS) — never in the same message as the link. Link valid ~180 days.</div>
     </div>
   </div>
 </div>
