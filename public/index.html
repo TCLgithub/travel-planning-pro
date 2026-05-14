@@ -3448,7 +3448,7 @@ function buildCityMaps(t){
       // ── External open-in-Google-Maps link ────────────────────────────
       const wps=places.map(p=>esc(p.name+', '+city+country));
       const googleDirUrl=places.length
-        ?`https://www.google.com/maps/dir/?api=1&origin=${esc(hotelQ)}&destination=${esc(hotelQ)}&waypoints=${wps.join('|')}&travelmode=walking`
+        ?`https://www.google.com/maps/dir/?api=1&origin=${esc(hotelQ)}&destination=${esc(hotelQ)}&waypoints=${wps.join('|')}&travelmode=driving`
         :`https://www.google.com/maps/search/?api=1&query=${esc(hotelQ)}`;
       const amapUrl=`https://www.amap.com/dir?origin[name]=${encodeURIComponent(h.name)}&destination[name]=${encodeURIComponent((places[0]?.name||city)+', '+city)}&type=walk&src=travel-pro`;
 
@@ -3474,10 +3474,18 @@ function buildCityMaps(t){
           ${places.map(p=>`<div class="wpt-seg">→</div><div class="wpt">${typeIcon[p.type]||'📍'} ${p.name}</div>`).join('')}
           ${places.length?`<div class="wpt-seg">→</div><div class="wpt" style="color:var(--ink-ll);font-size:.73rem">🏨 return</div>`:''}
         </div>
-        <div id="${leafletId}" style="height:300px;width:100%;background:var(--sand-d);position:relative;z-index:0"></div>
-        ${isCN?`<div style="padding:.45rem .95rem;background:var(--sand);border-top:1px solid var(--border);font-size:.71rem;color:var(--ink-ll)">
+        ${isCN
+          ? `<div id="${leafletId}" style="height:300px;width:100%;background:var(--sand-d);position:relative;z-index:0"></div>
+        <div style="padding:.45rem .95rem;background:var(--sand);border-top:1px solid var(--border);font-size:.71rem;color:var(--ink-ll)">
           💡 Google Maps is restricted in China. Use 高德地图 (Amap) above, or <a href="https://map.baidu.com/search/${encodeURIComponent(city)}" target="_blank" style="color:#1677ff;font-weight:600">百度地图 ↗</a> for turn-by-turn directions.
-        </div>`:''}
+        </div>`
+          : `<iframe
+          src="https://maps.google.com/maps?q=${encodeURIComponent(hotelQ)}&output=embed&hl=en&z=15"
+          style="height:300px;width:100%;border:0;display:block"
+          loading="lazy"
+          referrerpolicy="no-referrer-when-downgrade"
+          allowfullscreen></iframe>`
+        }
         ${isTW?`<div style="padding:.45rem .95rem;background:var(--sand);border-top:1px solid var(--border);font-size:.71rem;color:var(--ink-ll)">
           💡 Google Maps works great in Taiwan. Use <a href="https://www.metro.taipei/en/" target="_blank" style="color:#e3000f;font-weight:600">Taipei Metro ↗</a> for MRT routes. EasyCard (悠遊卡) covers metro, buses &amp; YouBike.
         </div>`:''}
@@ -3494,15 +3502,20 @@ function buildCityMaps(t){
       </div>`+cards.join('')
     :'';
 
-  // ── Build a Leaflet map inside each city card (staggered to avoid geocode rate-limits) ──
-  cardData.forEach(([,d],i)=>{
+  // ── Build Leaflet maps only for China cards (Google Maps is blocked there) ──
+  // All other destinations use the Google Maps ?q= iframe rendered above
+  let cnIdx=0;
+  cardData.forEach(([,d])=>{
     const h=d.hotel;
     const city=d.displayCity||h.city||'';
+    const _ctx=city+' '+allDests;
+    if(!CHINA_RE.test(_ctx))return; // Google Maps iframe handles non-CN
     const places=d.places.slice(0,4);
     const leafletId=`city-lf-${d.hotelIdx}`;
     setTimeout(()=>{
       _buildLeafletMap(leafletId, places, h.name, city, 'loop');
-    }, i*600); // stagger 600ms per card to respect Nominatim rate limit
+    }, cnIdx*600); // stagger only CN cards to respect Nominatim rate limit
+    cnIdx++;
   });
 }
 
@@ -6839,75 +6852,112 @@ async function applyAIModification(){
   statusEl.style.color='var(--gold-l)';
 
   try{
-    // Build compact, sendable representation of current trip
     const meta=tripData._meta||{};
-    const compact={
-      tripName:tripData.tripName,
-      destinations:tripData.destinations||[],
-      summary:tripData.summary||'',
-      totalBudgetEstimate:tripData.totalBudgetEstimate||'',
-      currency:tripData.currency||'',
-      language:tripData.language||'',
-      timezone:tripData.timezone||'',
-      flightTip:tripData.flightTip||'',
-      waypoints:tripData.waypoints||[],
-      transportSummary:tripData.transportSummary||[],
-      mustSeeAttractions:(tripData.mustSeeAttractions||[]).slice(0,6),
-      hotels:(tripData.hotels||[]).slice(0,5),
-      _meta:meta
-    };
-
-    // Include structured days if available (live trip); fall back to day-summary text
-    let daySummaryCtx='';
-    if(tripData.days?.length){
-      compact.days=tripData.days;
-    } else {
-      // Demo mode: extract concise day list from DOM
-      const el=$('day-summary-list');
-      if(el) daySummaryCtx='\n\nCurrent day-by-day schedule (for context):\n'+el.innerText.replace(/\s{2,}/g,' ').trim();
-    }
-
+    const totalDays=meta.days||(tripData.days||[]).length;
     const destStr=(tripData.destinations||[]).join(', ');
     const isChinese=/china|taiwan|hong kong|beijing|shanghai|guangzhou|shenzhen|chengdu|taipei|macau/i.test(destStr);
 
-    const prompt=`You are a world-class travel planner. A user has an existing trip plan and wants to make a specific modification.
+    // ── Compact trip context (NO full day JSON — too long for large trips) ──
+    const ctxObj={
+      tripName:tripData.tripName,
+      destinations:tripData.destinations||[],
+      waypoints:tripData.waypoints||[],
+      hotels:(tripData.hotels||[]).map(h=>({name:h.name,city:h.city,stars:h.stars,pricePerNight:h.pricePerNight})),
+      transportSummary:(tripData.transportSummary||[]).map(s=>({from:s.from,to:s.to,mode:s.mode,duration:s.duration,cost:s.cost})),
+      _meta:{start:meta.start,end:meta.end,days:totalDays,travellers:meta.travellers,homeCity:meta.homeCity,flightClass:meta.flightClass,budget:meta.budget,style:meta.style,pace:meta.pace}
+    };
+    // Concise day-by-day summary (text, not JSON) for AI context
+    let dayCtx='';
+    if(tripData.days?.length){
+      dayCtx=tripData.days.map(d=>
+        `Day ${d.dayNumber} (${d.city||''}): ${(d.activities||[]).slice(0,5).map(a=>a.name).join(', ')}`
+      ).join('\n');
+    } else {
+      const el=$('day-summary-list');
+      if(el) dayCtx=el.innerText.replace(/\s{2,}/g,' ').trim();
+    }
 
-CURRENT TRIP (JSON):
-${JSON.stringify(compact,null,1)}${daySummaryCtx}
+    // ── Chunked modification (same CHUNK=8 as initial generation) ──
+    const CHUNK=8;
+    const needsChunks=totalDays>CHUNK;
+    const _addDaysMod=(base,n)=>{const d=new Date(base);d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);};
+    const dateOfMod=n=>_addDaysMod(meta.start,n-1);
+    const daySchema=`{"dayNumber":1,"date":"YYYY-MM-DD","title":"string","theme":"emoji Theme","city":"string","activities":[{"time":"09:00","name":"string","description":"string","type":"attraction","emoji":"🏔","transport":"string","googleMapsUrl":"https://www.google.com/maps/search/?api=1&query=place","bookingUrl":"","websiteUrl":"","estimatedCost":"MYR 20","duration":"2h"}]}`;
+    const headerSchema=`{"tripName":"string","destinations":["string"],"summary":"2 sentences","totalBudgetEstimate":"MYR X–Y pp","flightTip":"string","currency":"[local currency]","language":"string","timezone":"string","waypoints":["string"],"transportSummary":[{"from":"A","to":"B","mode":"string","duration":"string","cost":"string","tip":"string"}],"mustSeeAttractions":[{"name":"string","city":"string","emoji":"🏔","category":"string","description":"string","estimatedCost":"string","duration":"2h","googleMapsUrl":"https://www.google.com/maps/search/?api=1&query=place"}],"hotels":[{"name":"string","city":"string","stars":4,"pricePerNight":"MYR 350","emoji":"🏨","description":"string","bookingUrl":"https://www.booking.com/search.html?ss=${encodeURIComponent(destStr)}","agodaUrl":"https://www.agoda.com/search?city=${encodeURIComponent(destStr)}"}],"days":[${daySchema}]}`;
 
-USER'S MODIFICATION REQUEST: "${instruction}"
+    const chunk1End=needsChunks?CHUNK:totalDays;
+    const modPrompt=`You are a world-class travel planner modifying an existing ${totalDays}-day trip.
+
+MODIFICATION REQUEST: "${instruction}"
+
+CURRENT TRIP STRUCTURE:
+${JSON.stringify(ctxObj,null,1)}
+
+CURRENT ITINERARY (day summaries):
+${dayCtx}
 
 INSTRUCTIONS:
-- Apply only the requested change. Keep everything else as-is.
-- If days are added or removed, renumber dayNumber sequentially and recalculate dates from the original start date.
-- Update transportSummary if destinations or order changes.
-- Update summary, totalBudgetEstimate, and waypoints only if necessary.
-- CRITICAL: Return ONLY valid JSON, no markdown, no code fences, no explanation.
+- Apply ONLY the requested modification. Keep everything else as-is.
+- Renumber dayNumber sequentially 1–${totalDays}. Recalculate dates from ${meta.start}.
+- Update hotels/transportSummary/waypoints only if the modification requires it.${needsChunks?`
+CHUNK INSTRUCTION: This is a ${totalDays}-day trip. Generate ONLY days 1–${chunk1End} in "days". Remaining days will be requested separately.`:''}
+CRITICAL: Return ONLY valid JSON — no markdown, no code fences.
+${headerSchema}`;
 
-Return the complete updated trip plan with this exact structure:
-{"tripName":"string","destinations":["string"],"summary":"2 sentences","totalBudgetEstimate":"MYR X–Y pp","flightTip":"string","currency":"string","language":"string","timezone":"string","waypoints":["string"],"transportSummary":[{"from":"A","to":"B","mode":"string","duration":"string","cost":"string","tip":"string"}],"mustSeeAttractions":[{"name":"string",${isChinese?'"nameZh":"","city":"","cityZh":""':'"city":"string"'},"emoji":"🏔","category":"string","description":"string","insiderTip":"string","estimatedCost":"string","ticketPrice":"e.g. Free / KRW 3,000 / MYR 25","ticketNote":"buy online recommended","openingHours":"09:00–18:00 (closed Mon)","howToGet":"Take MRT/subway to X station, 5 min walk","ticketUrl":"https://official-booking-link-or-empty","duration":"2h","bestTime":"string","rating":"4.8/5","bookingUrl":"https://www.viator.com/search?q=${encodeURIComponent(destStr)}","googleMapsUrl":"https://www.google.com/maps/search/?api=1&query=attraction"}],"hotels":[{"name":"string","city":"string","stars":4,"pricePerNight":"MYR 350","emoji":"🏨","description":"string","address":"string","bookingUrl":"https://www.booking.com/search.html?ss=${encodeURIComponent(destStr)}","agodaUrl":"https://www.agoda.com/search?city=${encodeURIComponent(destStr)}","tripadvisorUrl":"https://www.tripadvisor.com/Search?q=${encodeURIComponent(destStr)}"}],"days":[{"dayNumber":1,"date":"YYYY-MM-DD","title":"string","theme":"string","city":"string","activities":[{"time":"09:00","name":"string","description":"string","type":"attraction","emoji":"🏔","transport":"🚇 MRT to X station / 🚕 Grab ~MYR 12","googleMapsUrl":"https://www.google.com/maps/search/?api=1&query=place","bookingUrl":"","websiteUrl":"","estimatedCost":"string","duration":"string"}]}]}`;
+    statusEl.textContent=`⏳ Modifying${needsChunks?' (chunk 1/'+Math.ceil(totalDays/CHUNK)+')':''}…`;
 
-    statusEl.textContent='⏳ AI is modifying your itinerary…';
-
-    const raw=await silentCallAI(prompt);
+    const raw=await silentCallAI(modPrompt);
     statusEl.textContent='🔍 Parsing response…';
 
-    // Parse
-    let clean=raw.replace(/<think>[\s\S]*?<\/think>/gi,'').trim();
-    clean=clean.replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
-    const js=clean.indexOf('{'),je=clean.lastIndexOf('}');
-    if(js<0||je<0) throw new Error('No JSON in AI response');
-    clean=clean.slice(js,je+1);
+    function parseModJSON(text){
+      let c=text.replace(/<think>[\s\S]*?<\/think>/gi,'').trim();
+      c=c.replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
+      const js=c.indexOf('{'),je=c.lastIndexOf('}');
+      if(js<0||je<0) throw new Error('No JSON in AI response');
+      c=c.slice(js,je+1);
+      try{return JSON.parse(c);}catch(e){return JSON.parse(repairJSON(c));}
+    }
 
-    let modified;
-    try{ modified=JSON.parse(clean); }
-    catch(e){ modified=JSON.parse(repairJSON(clean)); }
+    let modified=parseModJSON(raw);
     if(!modified.days?.length) throw new Error('AI response has no day data — try rephrasing your request');
+
+    // ── Fetch remaining chunks for long trips ──────────────────────────
+    if(needsChunks){
+      let prevCity=modified.days[modified.days.length-1]?.city||destStr.split(',')[0].trim();
+      for(let from=chunk1End+1;from<=totalDays;from+=CHUNK){
+        const to=Math.min(from+CHUNK-1,totalDays);
+        statusEl.textContent=`⏳ Fetching days ${from}–${to}…`;
+        const contPrompt=`Continue the modified ${totalDays}-day trip "${tripData.tripName}".
+Modification applied: "${instruction}"
+Hotels: ${JSON.stringify(ctxObj.hotels)}
+Previous day ended in: ${prevCity}
+Generate ONLY days ${from} through ${to}. Day ${from} date = ${dateOfMod(from)}, Day ${to} date = ${dateOfMod(to)}.
+CRITICAL: Return ONLY valid JSON — no markdown.
+{"days":[{"dayNumber":${from},"date":"${dateOfMod(from)}","title":"string","theme":"emoji Theme","city":"string","activities":[{"time":"09:00","name":"string","description":"string","type":"attraction","emoji":"🏔","transport":"string","googleMapsUrl":"https://www.google.com/maps/search/?api=1&query=place","estimatedCost":"MYR 20","duration":"2h"}]}]}`;
+        const ct=await silentCallAI(contPrompt);
+        let cont;
+        try{
+          let cc=ct.replace(/<think>[\s\S]*?<\/think>/gi,'').trim();
+          cc=cc.replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
+          const cjs=cc.indexOf('{'),cje=cc.lastIndexOf('}');
+          if(cjs>=0&&cje>=0){cont=JSON.parse(repairJSON(cc.slice(cjs,cje+1)));}
+        }catch(e){cont=null;}
+        if(cont?.days?.length){
+          modified.days=[...modified.days,...cont.days];
+          prevCity=cont.days[cont.days.length-1]?.city||prevCity;
+        }
+      }
+    }
 
     // Calculate updated meta from new days
     const newDays=modified.days.length;
     const newStart=modified.days[0]?.date||meta.start;
     const newEnd=modified.days[newDays-1]?.date||meta.end;
+    if(needsChunks&&newDays<totalDays-1){
+      statusEl.textContent=`⚠ Only ${newDays}/${totalDays} days received — some chunks failed`;
+    } else {
+      statusEl.textContent=`✓ ${newDays} days updated`;
+    }
 
     tripData={
       ...tripData,
