@@ -2015,17 +2015,17 @@ FLIGHT TIME RULES:
 CRITICAL: Return ONLY valid JSON. No markdown, no code fences, no text outside JSON.${needsChunks?`
 CHUNK INSTRUCTION: This trip is ${days} days. Generate ONLY days 1–${chunk1End} in the "days" array. Remaining days will be requested separately. Plan the full city/hotel allocation across all ${days} days so that later chunks stay consistent.`:''}
 
-{"tripName":"string","destinations":["string"],"summary":"2 sentence overview","totalBudgetEstimate":"MYR X–Y pp","flightTip":"1 sentence","currency":"CAD (Canadian Dollar)","language":"English","timezone":"PST/EST","waypoints":["City1","City2"],
+{"tripName":"string","destinations":["string"],"summary":"2 sentence overview","totalBudgetEstimate":"MYR X–Y pp","flightTip":"1 sentence","currency":"TWD (New Taiwan Dollar)","language":"Mandarin Chinese","timezone":"Asia/Taipei","waypoints":["City1","City2"],
 "transportSummary":[{"from":"A","to":"B","mode":"✈ Flight","duration":"5h","cost":"MYR 800","tip":"Book ahead"}],
 "mustSeeAttractions":[
-  {"name":"string",${isChinese?'"nameZh":"中文","city":"string","cityZh":"城市"':'"city":"string"'},"emoji":"🏔","category":"Nature","description":"One concise sentence.","insiderTip":"tip","estimatedCost":"Free","ticketPrice":"Free / CAD 25 / etc","ticketNote":"book online recommended","openingHours":"09:00–17:00 (closed Mon)","howToGet":"🚇 MRT to X station exit 2, 5 min walk","ticketUrl":"https://official-ticket-link-or-omit","duration":"2h","bestTime":"Morning","rating":"4.8/5","bookingUrl":"https://www.viator.com/search?q=${esc(destStr)}","googleMapsUrl":"https://www.google.com/maps/search/?api=1&query=place+${esc(destStr)}"}
+  {"name":"string",${isChinese?'"nameZh":"中文","city":"string","cityZh":"城市"':'"city":"string"'},"emoji":"🏔","category":"Nature","description":"One concise sentence.","insiderTip":"tip","estimatedCost":"Free","ticketPrice":"Free / MYR 25 / etc","ticketNote":"book online recommended","openingHours":"09:00–17:00 (closed Mon)","howToGet":"🚇 MRT to X station exit 2, 5 min walk","ticketUrl":"https://official-ticket-link-or-omit","duration":"2h","bestTime":"Morning","rating":"4.8/5","bookingUrl":"https://www.viator.com/search?q=${esc(destStr)}","googleMapsUrl":"https://www.google.com/maps/search/?api=1&query=place+${esc(destStr)}"}
 ],
 "hotels":[
   {"name":"string",${isChinese?'"nameZh":"中文名",':''}"city":"string","stars":4,"pricePerNight":"MYR 350","emoji":"🏨","description":"One sentence.","address":"Full address",${isChinese?'"addressZh":"中文地址",':''}"bookingUrl":"https://www.booking.com/search.html?ss=${esc(destStr)}","agodaUrl":"https://www.agoda.com/search?city=${esc(destStr)}","tripadvisorUrl":"https://www.tripadvisor.com/Search?q=${esc(destStr)}"}
 ],
 "days":[
   {"dayNumber":1,"date":"${start}","title":"string","theme":"🏔 Adventure","city":"string","activities":[
-    {"time":"09:00","name":"string",${isChinese?'"nameZh":"中文",':''}"description":"One sentence with key tip.","type":"attraction","emoji":"🏔","transport":"🚇 MRT/Metro to X station — 20 min / 🚕 Grab ~MYR 12","googleMapsUrl":"https://www.google.com/maps/search/?api=1&query=place","bookingUrl":"","websiteUrl":"","estimatedCost":"CAD 20","duration":"2h"}
+    {"time":"09:00","name":"string",${isChinese?'"nameZh":"中文",':''}"description":"One sentence with key tip.","type":"attraction","emoji":"🏔","transport":"🚇 MRT/Metro to X station — 20 min / 🚕 Grab ~MYR 12","googleMapsUrl":"https://www.google.com/maps/search/?api=1&query=place","bookingUrl":"","websiteUrl":"","estimatedCost":"MYR 20","duration":"2h"}
   ]}
 ]}`;
 
@@ -3308,7 +3308,12 @@ function cleanPlaceName(name){
     .trim();
 }
 
-const CHINA_RE=/\b(china|taiwan|hong kong|shanghai|beijing|suzhou|hangzhou|guangzhou|shenzhen|chengdu|nanjing|wuhan|xi.?an|guilin|chongqing|kunming|taipei|macau|macao|zhejiang|jiangsu)\b/i;
+// Mainland China cities → append ", China"
+const CHINA_RE=/\b(china|shanghai|beijing|suzhou|hangzhou|guangzhou|shenzhen|chengdu|nanjing|wuhan|xi.?an|guilin|chongqing|kunming|zhejiang|jiangsu|sichuan|yunnan|guangdong)\b/i;
+// Separate regions with own Google Maps identity
+const TAIWAN_RE=/\b(taiwan|taipei|kaohsiung|taichung|tainan|hualien|keelung|taoyuan)\b/i;
+const HK_RE=/\b(hong kong|hongkong)\b/i;
+const MACAU_RE=/\b(macau|macao)\b/i;
 
 function buildCityMaps(t){
   const container=$('city-maps-section');
@@ -3367,8 +3372,13 @@ function buildCityMaps(t){
   const cards=cardData.map(([,d])=>{
       const h=d.hotel;
       const city=d.displayCity||h.city||'';  // original-case display name
-      const isCN=CHINA_RE.test(city)||CHINA_RE.test(allDests);
-      const country=isCN?', China':'';
+      // Determine correct country suffix for Google Maps geocoding accuracy
+      const _ctx=city+' '+allDests;
+      const isCN=CHINA_RE.test(_ctx);
+      const isTW=TAIWAN_RE.test(_ctx);
+      const isHK=HK_RE.test(_ctx);
+      const isMO=MACAU_RE.test(_ctx);
+      const country=isCN?', China':isTW?', Taiwan':isHK?', Hong Kong':isMO?', Macao':'';
       const places=d.places.slice(0,4);
       const hotelQ=`${h.name}, ${city}${country}`;
 
@@ -3378,8 +3388,9 @@ function buildCityMaps(t){
       const gmOrigin=gmEnc(h.name+', '+gmCtx);
       let gmEmbedSrc;
       if(places.length){
+        // dirflg=w = walking — most reliable for city-level attraction routes in embed
         const gmWps=[...places.map(p=>gmEnc(p.name+', '+gmCtx)),gmOrigin].join('+to:');
-        gmEmbedSrc=`https://maps.google.com/maps?saddr=${gmOrigin}&daddr=${gmWps}&output=embed&dirflg=r`;
+        gmEmbedSrc=`https://maps.google.com/maps?saddr=${gmOrigin}&daddr=${gmWps}&output=embed&dirflg=w`;
       }else{
         gmEmbedSrc=`https://maps.google.com/maps?q=${gmOrigin}&output=embed`;
       }
@@ -3389,6 +3400,7 @@ function buildCityMaps(t){
       const googleDirUrl=places.length
         ?`https://www.google.com/maps/dir/?api=1&origin=${esc(hotelQ)}&destination=${esc(hotelQ)}&waypoints=${wps.join('|')}&travelmode=walking`
         :`https://www.google.com/maps/search/?api=1&query=${esc(hotelQ)}`;
+      // Amap only for mainland China (not Taiwan / HK / Macau)
       const amapUrl=`https://www.amap.com/dir?origin[name]=${encodeURIComponent(h.name)}&destination[name]=${encodeURIComponent((places[0]?.name||city)+', '+city)}&type=walk&src=travel-pro`;
 
       const mapCardId=`city-map-${d.hotelIdx}`;
@@ -3411,6 +3423,9 @@ function buildCityMaps(t){
         <iframe src="${gmEmbedSrc}" class="city-map-iframe" style="height:300px;width:100%;border:none;display:block" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen title="Map — ${city}"></iframe>
         ${isCN?`<div style="padding:.45rem .95rem;background:var(--sand);border-top:1px solid var(--border);font-size:.71rem;color:var(--ink-ll)">
           💡 Use <a href="${amapUrl}" target="_blank" style="color:#1677ff;font-weight:600">高德地图 (Amap)</a> or <a href="https://map.baidu.com/search/${encodeURIComponent(city)}" target="_blank" style="color:#1677ff;font-weight:600">百度地图</a> for turn-by-turn directions in China.
+        </div>`:''}
+        ${isTW?`<div style="padding:.45rem .95rem;background:var(--sand);border-top:1px solid var(--border);font-size:.71rem;color:var(--ink-ll)">
+          💡 Google Maps works great in Taiwan. Use the MRT map on <a href="https://www.metro.taipei/en/" target="_blank" style="color:#e3000f;font-weight:600">Taipei Metro ↗</a> for subway directions. EasyCard (悠遊卡) covers metro, buses &amp; YouBike.
         </div>`:''}
         ${isKorea?`<div style="padding:.45rem .95rem;background:var(--sand);border-top:1px solid var(--border);font-size:.71rem;color:var(--ink-ll)">
           💡 In South Korea, use <a href="https://map.kakao.com/?q=${encodeURIComponent(city)}" target="_blank" style="color:#f9b800;font-weight:600">카카오맵</a> or <a href="https://map.naver.com/v5/search/${encodeURIComponent(city)}" target="_blank" style="color:#03C75A;font-weight:600">네이버지도</a> for transit directions. T-money card works everywhere.
