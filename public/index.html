@@ -1951,6 +1951,42 @@ function repairJSON(s){
   return base+stk2.reverse().join('');
 }
 
+// ── Currency safety-net: map destination text → correct local currency ──
+function _correctCurrency(destStr, aiCurrency){
+  const d=(destStr||'').toLowerCase();
+  const CURR_MAP=[
+    [/taiwan|taipei|kaohsiung|taichung|tainan|hualien/,       'TWD (New Taiwan Dollar)'],
+    [/japan|tokyo|osaka|kyoto|fukuoka|sapporo|nara|hiroshima/, 'JPY (Japanese Yen)'],
+    [/korea|seoul|busan|jeju|incheon|daegu/,                   'KRW (South Korean Won)'],
+    [/thailand|bangkok|phuket|chiang mai|pattaya/,             'THB (Thai Baht)'],
+    [/singapore/,                                               'SGD (Singapore Dollar)'],
+    [/hong kong/,                                               'HKD (Hong Kong Dollar)'],
+    [/macau|macao/,                                             'MOP (Macanese Pataca)'],
+    [/china|beijing|shanghai|guangzhou|shenzhen|chengdu/,      'CNY (Chinese Yuan)'],
+    [/vietnam|hanoi|ho chi minh|da nang|hoi an/,              'VND (Vietnamese Dong)'],
+    [/cambodia|phnom penh|siem reap/,                          'USD / KHR (Cambodian Riel)'],
+    [/indonesia|bali|jakarta|yogyakarta/,                      'IDR (Indonesian Rupiah)'],
+    [/philippines|manila|cebu|palawan/,                        'PHP (Philippine Peso)'],
+    [/myanmar|yangon|mandalay/,                                'MMK (Myanmar Kyat)'],
+    [/india|delhi|mumbai|goa|jaipur|bangalore/,               'INR (Indian Rupee)'],
+    [/australia|sydney|melbourne|brisbane|perth/,              'AUD (Australian Dollar)'],
+    [/new zealand/,                                             'NZD (New Zealand Dollar)'],
+    [/uk|united kingdom|london|edinburgh|manchester/,           'GBP (British Pound)'],
+    [/europe|france|paris|germany|italy|spain|amsterdam/,      'EUR (Euro)'],
+    [/turkey|istanbul|ankara/,                                  'TRY (Turkish Lira)'],
+    [/uae|dubai|abu dhabi/,                                    'AED (UAE Dirham)'],
+    [/saudi|riyadh|jeddah/,                                    'SAR (Saudi Riyal)'],
+    [/usa|new york|los angeles|hawaii|las vegas|chicago/,      'USD (US Dollar)'],
+    [/canada|toronto|vancouver|montreal|banff|whistler/,       'CAD (Canadian Dollar)'],
+  ];
+  for(const[re,cur]of CURR_MAP){
+    if(re.test(d)) return cur;
+  }
+  // Keep whatever AI returned if no mapping matched and it isn't blank/MYR
+  if(aiCurrency && aiCurrency.trim() && !/^MYR/i.test(aiCurrency)) return aiCurrency;
+  return aiCurrency||'';
+}
+
 // ══ GENERATE ALL ══
 async function generateAll(){
   const dests=getDestinations();
@@ -2012,10 +2048,12 @@ FLIGHT TIME RULES:
 - Return >4h: last day = checkout + airport transfer only. Title "Departure Day".
 - Return ≤4h: light morning activities OK on last day.
 
+IMPORTANT: Set the "currency" field to the official local currency of the PRIMARY destination (e.g. TWD for Taiwan, JPY for Japan, KRW for Korea, THB for Thailand, EUR for Europe, GBP for UK, AUD for Australia, CNY for China, SGD for Singapore, HKD for Hong Kong). NOT MYR, NOT CAD — use the destination's own currency.
+
 CRITICAL: Return ONLY valid JSON. No markdown, no code fences, no text outside JSON.${needsChunks?`
 CHUNK INSTRUCTION: This trip is ${days} days. Generate ONLY days 1–${chunk1End} in the "days" array. Remaining days will be requested separately. Plan the full city/hotel allocation across all ${days} days so that later chunks stay consistent.`:''}
 
-{"tripName":"string","destinations":["string"],"summary":"2 sentence overview","totalBudgetEstimate":"MYR X–Y pp","flightTip":"1 sentence","currency":"TWD (New Taiwan Dollar)","language":"Mandarin Chinese","timezone":"Asia/Taipei","waypoints":["City1","City2"],
+{"tripName":"string","destinations":["string"],"summary":"2 sentence overview","totalBudgetEstimate":"MYR X–Y pp","flightTip":"1 sentence","currency":"[local currency of destination, e.g. TWD for Taiwan]","language":"[destination language]","timezone":"[destination timezone]","waypoints":["City1","City2"],
 "transportSummary":[{"from":"A","to":"B","mode":"✈ Flight","duration":"5h","cost":"MYR 800","tip":"Book ahead"}],
 "mustSeeAttractions":[
   {"name":"string",${isChinese?'"nameZh":"中文","city":"string","cityZh":"城市"':'"city":"string"'},"emoji":"🏔","category":"Nature","description":"One concise sentence.","insiderTip":"tip","estimatedCost":"Free","ticketPrice":"Free / MYR 25 / etc","ticketNote":"book online recommended","openingHours":"09:00–17:00 (closed Mon)","howToGet":"🚇 MRT to X station exit 2, 5 min walk","ticketUrl":"https://official-ticket-link-or-omit","duration":"2h","bestTime":"Morning","rating":"4.8/5","bookingUrl":"https://www.viator.com/search?q=${esc(destStr)}","googleMapsUrl":"https://www.google.com/maps/search/?api=1&query=place+${esc(destStr)}"}
@@ -2128,6 +2166,8 @@ CRITICAL: Return ONLY valid JSON — no markdown, no text outside JSON.
 
     tripData={...t,_meta:{start,end,days,travellers,homeCity,flightClass,provider,model,dests,
       tripName:name,budget,style,accom,accomLoc,transport,diet,food,pace,special,nightsPerCity}};
+    // Safety net: if AI returned wrong currency, snap to correct one based on destination
+    tripData.currency=_correctCurrency(destStr,tripData.currency);
     saveTrip(tripData);
     try{renderItinerary(tripData);}catch(re){console.error('renderItinerary:',re);}
     goTab('itin');
@@ -2178,8 +2218,8 @@ Return ONLY valid JSON — no markdown, no code fences, nothing outside JSON:
       {"item":"Passport","detail":"Valid 6+ months from entry date"},
       {"item":"eTA / Arrival Card","detail":"Required — apply online before travel","url":"https://www.example.gov/eta-apply"}
     ],
-    "currency":{"local":"CAD — Canadian Dollar","rate":"1 CAD ≈ 3.33 MYR","cashTip":"Credit cards accepted almost everywhere; carry some cash for markets"},
-    "localTransport":[{"type":"Subway/CTrain","tip":"Get a reloadable transit card","cost":"CAD 3.60 per ride"}],
+    "currency":{"local":"TWD — New Taiwan Dollar","rate":"1 TWD ≈ 0.14 MYR","cashTip":"Cards accepted widely; carry NTD cash for night markets and small vendors"},
+    "localTransport":[{"type":"MRT/Metro","tip":"Get a reloadable transit card (e.g. EasyCard / Octopus / T-money)","cost":"varies by distance"}],
     "apps":{"eWallet":[],"eHailing":[{"name":"Uber","note":"Main ride-hailing app"}],"food":[{"name":"DoorDash","note":"Food delivery"}],"maps":[{"name":"Google Maps","note":"Download offline maps"}],"other":[]},
     /* IMPORTANT — auto-select correct apps by destination:
        Korea → eHailing: KakaoTaxi, maps: KakaoMap + Naver Map, eWallet: Kakao Pay / Naver Pay / TNG Alipay+, food: Baemin / Coupang Eats
@@ -2496,7 +2536,13 @@ const CITY_COORDS={
   'santiago':[-33.4489,-70.6693],'quito':[-0.2295,-78.5243],
   'cusco':[-13.5319,-71.9675],'machu picchu':[-13.1631,-72.5450],
   'cancun':[21.1619,-86.8515],'mexico city':[19.4326,-99.1332],
-  'havana':[23.1136,-82.3666]
+  'havana':[23.1136,-82.3666],
+  // Taiwan
+  'taipei':[25.0478,121.5319],'kaohsiung':[22.6273,120.3014],
+  'taichung':[24.1477,120.6736],'tainan':[22.9999,120.2270],
+  'hualien':[23.9910,121.6011],'keelung':[25.1276,121.7392],
+  'taoyuan':[24.9936,121.3010],'jiufen':[25.1093,121.8440],
+  'taroko':[24.1660,121.6248],'alishan':[23.5126,120.8036]
 };
 
 // Lookup city coordinates — checks DB first, then falls back to Photon API (CORS-friendly)
@@ -3371,8 +3417,7 @@ function buildCityMaps(t){
 
   const cards=cardData.map(([,d])=>{
       const h=d.hotel;
-      const city=d.displayCity||h.city||'';  // original-case display name
-      // Determine correct country suffix for Google Maps geocoding accuracy
+      const city=d.displayCity||h.city||'';
       const _ctx=city+' '+allDests;
       const isCN=CHINA_RE.test(_ctx);
       const isTW=TAIWAN_RE.test(_ctx);
@@ -3382,29 +3427,16 @@ function buildCityMaps(t){
       const places=d.places.slice(0,4);
       const hotelQ=`${h.name}, ${city}${country}`;
 
-      // ── Google Maps embed URL (saddr/daddr format — no API key required) ──
-      const gmEnc=s=>encodeURIComponent(s).replace(/%20/g,'+').replace(/%2C/g,',');
-      const gmCtx=city+country;
-      const gmOrigin=gmEnc(h.name+', '+gmCtx);
-      let gmEmbedSrc;
-      if(places.length){
-        // dirflg=w = walking — most reliable for city-level attraction routes in embed
-        const gmWps=[...places.map(p=>gmEnc(p.name+', '+gmCtx)),gmOrigin].join('+to:');
-        gmEmbedSrc=`https://maps.google.com/maps?saddr=${gmOrigin}&daddr=${gmWps}&output=embed&dirflg=w`;
-      }else{
-        gmEmbedSrc=`https://maps.google.com/maps?q=${gmOrigin}&output=embed`;
-      }
-
-      // ── External open-in-new-tab link ────────────────────────────────
+      // ── External open-in-Google-Maps link ────────────────────────────
       const wps=places.map(p=>esc(p.name+', '+city+country));
       const googleDirUrl=places.length
         ?`https://www.google.com/maps/dir/?api=1&origin=${esc(hotelQ)}&destination=${esc(hotelQ)}&waypoints=${wps.join('|')}&travelmode=walking`
         :`https://www.google.com/maps/search/?api=1&query=${esc(hotelQ)}`;
-      // Amap only for mainland China (not Taiwan / HK / Macau)
       const amapUrl=`https://www.amap.com/dir?origin[name]=${encodeURIComponent(h.name)}&destination[name]=${encodeURIComponent((places[0]?.name||city)+', '+city)}&type=walk&src=travel-pro`;
 
       const mapCardId=`city-map-${d.hotelIdx}`;
-      const isKorea=/korea|korean|seoul|busan|jeju|incheon|daegu|daejeon|gwangju/i.test(city+allDests);
+      const leafletId=`city-lf-${d.hotelIdx}`;
+      const isKorea=/korea|korean|seoul|busan|jeju|incheon|daegu|daejeon|gwangju/i.test(_ctx);
       return `
       <div class="map-card" id="${mapCardId}">
         <div class="map-hdr">
@@ -3420,15 +3452,15 @@ function buildCityMaps(t){
           ${places.map(p=>`<div class="wpt-seg">→</div><div class="wpt">${typeIcon[p.type]||'📍'} ${p.name}</div>`).join('')}
           ${places.length?`<div class="wpt-seg">→</div><div class="wpt" style="color:var(--ink-ll);font-size:.73rem">🏨 return</div>`:''}
         </div>
-        <iframe src="${gmEmbedSrc}" class="city-map-iframe" style="height:300px;width:100%;border:none;display:block" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen title="Map — ${city}"></iframe>
+        <div id="${leafletId}" style="height:300px;width:100%;background:var(--sand-d);position:relative;z-index:0"></div>
         ${isCN?`<div style="padding:.45rem .95rem;background:var(--sand);border-top:1px solid var(--border);font-size:.71rem;color:var(--ink-ll)">
           💡 Use <a href="${amapUrl}" target="_blank" style="color:#1677ff;font-weight:600">高德地图 (Amap)</a> or <a href="https://map.baidu.com/search/${encodeURIComponent(city)}" target="_blank" style="color:#1677ff;font-weight:600">百度地图</a> for turn-by-turn directions in China.
         </div>`:''}
         ${isTW?`<div style="padding:.45rem .95rem;background:var(--sand);border-top:1px solid var(--border);font-size:.71rem;color:var(--ink-ll)">
-          💡 Google Maps works great in Taiwan. Use the MRT map on <a href="https://www.metro.taipei/en/" target="_blank" style="color:#e3000f;font-weight:600">Taipei Metro ↗</a> for subway directions. EasyCard (悠遊卡) covers metro, buses &amp; YouBike.
+          💡 Google Maps works great in Taiwan. Use <a href="https://www.metro.taipei/en/" target="_blank" style="color:#e3000f;font-weight:600">Taipei Metro ↗</a> for MRT routes. EasyCard (悠遊卡) covers metro, buses &amp; YouBike.
         </div>`:''}
         ${isKorea?`<div style="padding:.45rem .95rem;background:var(--sand);border-top:1px solid var(--border);font-size:.71rem;color:var(--ink-ll)">
-          💡 In South Korea, use <a href="https://map.kakao.com/?q=${encodeURIComponent(city)}" target="_blank" style="color:#f9b800;font-weight:600">카카오맵</a> or <a href="https://map.naver.com/v5/search/${encodeURIComponent(city)}" target="_blank" style="color:#03C75A;font-weight:600">네이버지도</a> for transit directions. T-money card works everywhere.
+          💡 Use <a href="https://map.kakao.com/?q=${encodeURIComponent(city)}" target="_blank" style="color:#f9b800;font-weight:600">카카오맵</a> or <a href="https://map.naver.com/v5/search/${encodeURIComponent(city)}" target="_blank" style="color:#03C75A;font-weight:600">네이버지도</a> for transit. T-money card works everywhere.
         </div>`:''}
       </div>`;
     });
@@ -3436,9 +3468,20 @@ function buildCityMaps(t){
   container.innerHTML=cardData.length
     ?`<div class="sec-hdr" style="margin-top:1.2rem">
         <div class="sec-title">🏙 City Maps</div>
-        <div class="muted" style="font-size:.72rem">Walking route: hotel → attractions → hotel. Tap 🗺 Google Maps ↗ for turn-by-turn directions.</div>
+        <div class="muted" style="font-size:.72rem">Route: hotel → attractions → hotel. Tap 🗺 Google Maps ↗ for turn-by-turn directions.</div>
       </div>`+cards.join('')
     :'';
+
+  // ── Build a Leaflet map inside each city card (staggered to avoid geocode rate-limits) ──
+  cardData.forEach(([,d],i)=>{
+    const h=d.hotel;
+    const city=d.displayCity||h.city||'';
+    const places=d.places.slice(0,4);
+    const leafletId=`city-lf-${d.hotelIdx}`;
+    setTimeout(()=>{
+      _buildLeafletMap(leafletId, places, h.name, city, 'loop');
+    }, i*600); // stagger 600ms per card to respect Nominatim rate limit
+  });
 }
 
 function changeHotel(idx){
