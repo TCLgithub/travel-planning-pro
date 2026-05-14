@@ -3290,30 +3290,54 @@ function buildMap(t){
   });
   $('wpts-row').innerHTML=wHtml||'<div class="muted" style="font-size:.75rem;padding:.2rem">All legs are flights — see below for details.</div>';
 
-  // ── Embed: Leaflet map for the main route view ───────────────────────
+  // ── Embed: main route overview map ────────────────────────────────
   const mapFrame=$('map-frame');
   if(mapFrame){
     mapFrame.style.display='none';
-    let leafletMainDiv=document.getElementById('map-frame-leaflet');
-    if(!leafletMainDiv){
-      leafletMainDiv=document.createElement('div');
-      leafletMainDiv.id='map-frame-leaflet';
-      mapFrame.parentNode.insertBefore(leafletMainDiv,mapFrame);
-    }
-    leafletMainDiv.style.cssText='width:100%;height:480px;background:var(--sand-d);z-index:0;position:relative;border-radius:6px;display:block';
+    // Remove any previously inserted map element (Leaflet div or iframe)
+    const _oldMapEl=document.getElementById('map-frame-leaflet');
+    if(_oldMapEl)_oldMapEl.remove();
+
+    const _routeAllDests=(t.destinations||[]).join(' ')+' '+((t._meta?.dests||[]).join(' '));
+    const _routeIsCN=CHINA_RE.test(_routeAllDests);
     const firstCity=mapWps[0]||'';
-    let cityPlaces=mapWps.slice(1).map(w=>({name:w,type:'attraction'}));
-    // Single-city trip: populate overview map with must-see attractions instead
-    if(cityPlaces.length===0){
-      const attractions=(t.mustSeeAttractions||[]).slice(0,5).map(a=>({name:a.name,type:'attraction'}));
-      cityPlaces=attractions;
+
+    if(_routeIsCN){
+      // China: keep Leaflet/OpenStreetMap — Google Maps is blocked
+      const _lDiv=document.createElement('div');
+      _lDiv.id='map-frame-leaflet';
+      _lDiv.style.cssText='width:100%;height:480px;background:var(--sand-d);z-index:0;position:relative;border-radius:6px;display:block';
+      mapFrame.parentNode.insertBefore(_lDiv,mapFrame);
+      let cityPlaces=mapWps.slice(1).map(w=>({name:w,type:'attraction'}));
+      if(cityPlaces.length===0){
+        const attractions=(t.mustSeeAttractions||[]).slice(0,5).map(a=>({name:a.name,type:'attraction'}));
+        cityPlaces=attractions;
+      }
+      _buildLeafletMap('map-frame-leaflet', cityPlaces, firstCity, firstCity, true);
+    } else {
+      // Non-China: Google Maps embed (driving route between waypoints)
+      let _gmSrc;
+      if(mapWps.length>=2){
+        const _gmO=encodeURIComponent(mapWps[0]);
+        const _gmD=mapWps.slice(1).map(encodeURIComponent).join('+to:');
+        _gmSrc=`https://maps.google.com/maps?saddr=${_gmO}&daddr=${_gmD}&output=embed&hl=en&dirflg=d`;
+      } else {
+        _gmSrc=`https://maps.google.com/maps?q=${encodeURIComponent(firstCity||wps[0]||'')}&output=embed&hl=en&z=12`;
+      }
+      const _gmIframe=document.createElement('iframe');
+      _gmIframe.id='map-frame-leaflet';
+      _gmIframe.src=_gmSrc;
+      _gmIframe.style.cssText='width:100%;height:480px;border:0;border-radius:6px;display:block';
+      _gmIframe.setAttribute('loading','lazy');
+      _gmIframe.setAttribute('referrerpolicy','no-referrer-when-downgrade');
+      _gmIframe.setAttribute('allowfullscreen','');
+      mapFrame.parentNode.insertBefore(_gmIframe,mapFrame);
     }
-    _buildLeafletMap('map-frame-leaflet', cityPlaces, firstCity, firstCity, true/*drawRoute*/);
   }
 
   // ── Header links ───────────────────────────────────────────────────
   const gDirUrl=mapWps.length>=2
-    ?`https://www.google.com/maps/dir/?api=1&origin=${esc(mapWps[0])}&destination=${esc(mapWps[mapWps.length-1])}&waypoints=${mapWps.slice(1,-1).map(esc).join('|')}&travelmode=transit`
+    ?`https://www.google.com/maps/dir/?api=1&origin=${esc(mapWps[0])}&destination=${esc(mapWps[mapWps.length-1])}&waypoints=${mapWps.slice(1,-1).map(esc).join('|')}&travelmode=driving`
     :`https://www.google.com/maps/search/?api=1&query=${esc(wps[0])}`;
   $('map-hdr-links').innerHTML=`<a href="${gDirUrl}" target="_blank" class="btn btn-ghost btn-sm">🗺 Open Route ↗</a>`;
 
@@ -3452,15 +3476,36 @@ function buildCityMaps(t){
         :`https://www.google.com/maps/search/?api=1&query=${esc(hotelQ)}`;
       const amapUrl=`https://www.amap.com/dir?origin[name]=${encodeURIComponent(h.name)}&destination[name]=${encodeURIComponent((places[0]?.name||city)+', '+city)}&type=walk&src=travel-pro`;
 
-      const mapCardId=`city-map-${d.hotelIdx}`;
-      const leafletId=`city-lf-${d.hotelIdx}`;
+      const mapCardId='city-map-'+d.hotelIdx;
+      const leafletId='city-lf-'+d.hotelIdx;
       const isKorea=/korea|korean|seoul|busan|jeju|incheon|daegu|daejeon|gwangju/i.test(_ctx);
+
+      // Pre-compute map embed HTML to avoid nested template literal issues
+      const _gmQ=encodeURIComponent(hotelQ);
+      const _cityMapHtml=isCN
+        ?('<div id="'+leafletId+'" style="height:300px;width:100%;background:var(--sand-d);position:relative;z-index:0"></div>'
+          +'<div style="padding:.45rem .95rem;background:var(--sand);border-top:1px solid var(--border);font-size:.71rem;color:var(--ink-ll)">'
+          +'💡 Google Maps is restricted in China. Use 高德地图 (Amap) above, or '
+          +'<a href="https://map.baidu.com/search/'+encodeURIComponent(city)+'" target="_blank" style="color:#1677ff;font-weight:600">百度地图 ↗</a> for turn-by-turn directions.</div>')
+        :('<iframe src="https://maps.google.com/maps?q='+_gmQ+'&output=embed&hl=en&z=15"'
+          +' style="height:300px;width:100%;border:0;display:block"'
+          +' loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>');
+
+      // Tip note below map
+      const _tipHtml=isCN?''
+        :isTW?('<div style="padding:.45rem .95rem;background:var(--sand);border-top:1px solid var(--border);font-size:.71rem;color:var(--ink-ll)">'
+          +'💡 Google Maps works great in Taiwan. Use <a href="https://www.metro.taipei/en/" target="_blank" style="color:#e3000f;font-weight:600">Taipei Metro ↗</a> for MRT routes. EasyCard (悠遊卡) covers metro, buses &amp; YouBike.</div>')
+        :isKorea?('<div style="padding:.45rem .95rem;background:var(--sand);border-top:1px solid var(--border);font-size:.71rem;color:var(--ink-ll)">'
+          +'💡 카카오맵 is the go-to map in Korea. Also try <a href="https://map.naver.com/v5/search/'+encodeURIComponent(city)+'" target="_blank" style="color:#03C75A;font-weight:600">네이버지도 ↗</a> for public transit. T-money card works everywhere.</div>')
+        :'';
+
       // One primary map button per destination
       const _mapBtn=isCN
-        ?`<a href="${amapUrl}" target="_blank" class="btn btn-ghost btn-sm" style="color:#1677ff;border-color:#1677ff">🗺 高德地图 (Amap) ↗</a>`
+        ?'<a href="'+amapUrl+'" target="_blank" class="btn btn-ghost btn-sm" style="color:#1677ff;border-color:#1677ff">🗺 高德地图 (Amap) ↗</a>'
         :isKorea
-        ?`<a href="https://map.kakao.com/?q=${encodeURIComponent(hotelQ)}" target="_blank" class="btn btn-ghost btn-sm" style="color:#f9b800;background:#1a0f00;border-color:#5D3A1A">🗺 카카오맵 ↗</a>`
-        :`<a href="${googleDirUrl}" target="_blank" class="btn btn-ghost btn-sm">🗺 Google Maps ↗</a>`;
+        ?'<a href="https://map.kakao.com/?q='+encodeURIComponent(hotelQ)+'" target="_blank" class="btn btn-ghost btn-sm" style="color:#f9b800;background:#1a0f00;border-color:#5D3A1A">🗺 카카오맵 ↗</a>'
+        :'<a href="'+googleDirUrl+'" target="_blank" class="btn btn-ghost btn-sm">🗺 Google Maps ↗</a>';
+
       return `
       <div class="map-card" id="${mapCardId}">
         <div class="map-hdr">
@@ -3474,24 +3519,8 @@ function buildCityMaps(t){
           ${places.map(p=>`<div class="wpt-seg">→</div><div class="wpt">${typeIcon[p.type]||'📍'} ${p.name}</div>`).join('')}
           ${places.length?`<div class="wpt-seg">→</div><div class="wpt" style="color:var(--ink-ll);font-size:.73rem">🏨 return</div>`:''}
         </div>
-        ${isCN
-          ? `<div id="${leafletId}" style="height:300px;width:100%;background:var(--sand-d);position:relative;z-index:0"></div>
-        <div style="padding:.45rem .95rem;background:var(--sand);border-top:1px solid var(--border);font-size:.71rem;color:var(--ink-ll)">
-          💡 Google Maps is restricted in China. Use 高德地图 (Amap) above, or <a href="https://map.baidu.com/search/${encodeURIComponent(city)}" target="_blank" style="color:#1677ff;font-weight:600">百度地图 ↗</a> for turn-by-turn directions.
-        </div>`
-          : `<iframe
-          src="https://maps.google.com/maps?q=${encodeURIComponent(hotelQ)}&output=embed&hl=en&z=15"
-          style="height:300px;width:100%;border:0;display:block"
-          loading="lazy"
-          referrerpolicy="no-referrer-when-downgrade"
-          allowfullscreen></iframe>`
-        }
-        ${isTW?`<div style="padding:.45rem .95rem;background:var(--sand);border-top:1px solid var(--border);font-size:.71rem;color:var(--ink-ll)">
-          💡 Google Maps works great in Taiwan. Use <a href="https://www.metro.taipei/en/" target="_blank" style="color:#e3000f;font-weight:600">Taipei Metro ↗</a> for MRT routes. EasyCard (悠遊卡) covers metro, buses &amp; YouBike.
-        </div>`:''}
-        ${isKorea?`<div style="padding:.45rem .95rem;background:var(--sand);border-top:1px solid var(--border);font-size:.71rem;color:var(--ink-ll)">
-          💡 카카오맵 is the go-to map in Korea. Also try <a href="https://map.naver.com/v5/search/${encodeURIComponent(city)}" target="_blank" style="color:#03C75A;font-weight:600">네이버지도 ↗</a> for public transit. T-money card works everywhere.
-        </div>`:''}
+        ${_cityMapHtml}
+        ${_tipHtml}
       </div>`;
     });
 
@@ -3732,6 +3761,8 @@ function buildDays(t,total){
 function renderGuide(g){
   const destStr=g?.destination||(tripData?.destinations||[]).join(', ')||tripData?.destination||'';
   const isTaiwan=/taiwan|taipei|kaohsiung|taichung|tainan|hualien/i.test(destStr);
+  // TNG Alipay+ is only available in select Asian countries — not in Canada, USA, Australia, Europe, etc.
+  const isTNGCountry=/japan|tokyo|osaka|kyoto|fukuoka|sapporo|nara|hiroshima|korea|korean|seoul|busan|jeju|incheon|daegu|thailand|bangkok|phuket|chiangmai|chiang mai|chiang rai|philippines|manila|cebu|boracay|palawan|singapore|hong kong|hongkong|macau|macao|indonesia|bali|jakarta|yogyakarta|vietnam|hanoi|ho chi minh|saigon|da nang|hoi an|cambodia|phnom penh|siem reap|myanmar|rangoon|yangon/i.test(destStr);
   if(!g&&!tripData){return;}
   $('badge-guide').style.display='inline';
   $('empty-guide').style.display='none';
@@ -3805,7 +3836,7 @@ function renderGuide(g){
               <div class="guide-item-val">Load MYR, spend in TWD at near mid-market rates. Better than credit card foreign transaction fees.</div>
               <div class="guide-item-sub"><a href="https://wise.com" target="_blank" style="color:var(--teal)">wise.com ↗</a> · Apply 2–3 weeks before travel</div>
             </div>
-          </div>`:`
+          </div>`:isTNGCountry?`
           <div class="guide-section-title">💳 TNG eWallet & Alipay+ Overseas</div>
           <div class="guide-grid">
             <div class="guide-item">
@@ -3832,6 +3863,24 @@ function renderGuide(g){
               <div class="guide-item-title">💡 Backup: Wise Travel Card</div>
               <div class="guide-item-val">Load MYR, spend in local currency at near mid-market rates. Better than credit card foreign transaction fees.</div>
               <div class="guide-item-sub"><a href="https://wise.com" target="_blank" style="color:var(--teal)">wise.com ↗</a> · Apply 2–3 weeks before travel</div>
+            </div>
+          </div>`:`
+          <div class="guide-section-title">💳 Payments Abroad</div>
+          <div class="guide-grid">
+            <div class="guide-item">
+              <div class="guide-item-title">💳 Credit & Debit Cards</div>
+              <div class="guide-item-val">Visa & Mastercard are widely accepted. Notify your bank before travelling to avoid blocks. Watch for foreign transaction fees (1–3%).</div>
+              <div class="guide-item-sub">AmEx acceptance may be limited at smaller merchants</div>
+            </div>
+            <div class="guide-item">
+              <div class="guide-item-title">💡 Wise Travel Card</div>
+              <div class="guide-item-val">Load MYR, spend in local currency at near mid-market rates — no hidden foreign transaction fees. Best rate option for most destinations.</div>
+              <div class="guide-item-sub"><a href="https://wise.com" target="_blank" style="color:var(--teal)">wise.com ↗</a> · Apply 2–3 weeks before travel</div>
+            </div>
+            <div class="guide-item">
+              <div class="guide-item-title">💵 Local Cash</div>
+              <div class="guide-item-val">Carry some local currency for taxis, tips, small shops and emergencies. Withdraw at airport ATMs on arrival — avoid airport exchange counters (poor rates).</div>
+              <div class="guide-item-sub">Most destinations: card is sufficient · Cash useful as backup</div>
             </div>
           </div>`}
         </div>
@@ -3962,7 +4011,7 @@ function renderGuide(g){
               <div class="guide-item-val">Load MYR, spend in TWD at near mid-market rates. Better than credit card foreign transaction fees.</div>
               <div class="guide-item-sub"><a href="https://wise.com" target="_blank" style="color:var(--teal)">wise.com ↗</a> · Apply 2–3 weeks before travel</div>
             </div>
-          </div>`:`
+          </div>`:isTNGCountry?`
           <div class="guide-section-title">💳 TNG eWallet & Alipay+ Overseas</div>
           <div class="guide-grid">
             <div class="guide-item">
@@ -3989,6 +4038,24 @@ function renderGuide(g){
               <div class="guide-item-title">💡 Backup: Wise Travel Card</div>
               <div class="guide-item-val">Load MYR, spend in local currency at near mid-market rates. Better than credit card foreign transaction fees.</div>
               <div class="guide-item-sub"><a href="https://wise.com" target="_blank" style="color:var(--teal)">wise.com ↗</a> · Apply 2–3 weeks before travel</div>
+            </div>
+          </div>`:`
+          <div class="guide-section-title">💳 Payments Abroad</div>
+          <div class="guide-grid">
+            <div class="guide-item">
+              <div class="guide-item-title">💳 Credit & Debit Cards</div>
+              <div class="guide-item-val">Visa & Mastercard are widely accepted. Notify your bank before travelling to avoid blocks. Watch for foreign transaction fees (1–3%).</div>
+              <div class="guide-item-sub">AmEx acceptance may be limited at smaller merchants</div>
+            </div>
+            <div class="guide-item">
+              <div class="guide-item-title">💡 Wise Travel Card</div>
+              <div class="guide-item-val">Load MYR, spend in local currency at near mid-market rates — no hidden foreign transaction fees. Best rate option for most destinations.</div>
+              <div class="guide-item-sub"><a href="https://wise.com" target="_blank" style="color:var(--teal)">wise.com ↗</a> · Apply 2–3 weeks before travel</div>
+            </div>
+            <div class="guide-item">
+              <div class="guide-item-title">💵 Local Cash</div>
+              <div class="guide-item-val">Carry some local currency for taxis, tips, small shops and emergencies. Withdraw at airport ATMs on arrival — avoid airport exchange counters (poor rates).</div>
+              <div class="guide-item-sub">Most destinations: card is sufficient · Cash useful as backup</div>
             </div>
           </div>`}
         </div>
