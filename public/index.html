@@ -3481,15 +3481,27 @@ function buildCityMaps(t){
       const isKorea=/korea|korean|seoul|busan|jeju|incheon|daegu|daejeon|gwangju/i.test(_ctx);
 
       // Pre-compute map embed HTML to avoid nested template literal issues
-      const _gmQ=encodeURIComponent(hotelQ);
-      const _cityMapHtml=isCN
-        ?('<div id="'+leafletId+'" style="height:300px;width:100%;background:var(--sand-d);position:relative;z-index:0"></div>'
+      // Build Google Maps route: hotel → attraction1 → attraction2 → ... → hotel
+      let _cityMapHtml;
+      if(isCN){
+        _cityMapHtml='<div id="'+leafletId+'" style="height:300px;width:100%;background:var(--sand-d);position:relative;z-index:0"></div>'
           +'<div style="padding:.45rem .95rem;background:var(--sand);border-top:1px solid var(--border);font-size:.71rem;color:var(--ink-ll)">'
           +'💡 Google Maps is restricted in China. Use 高德地图 (Amap) above, or '
-          +'<a href="https://map.baidu.com/search/'+encodeURIComponent(city)+'" target="_blank" style="color:#1677ff;font-weight:600">百度地图 ↗</a> for turn-by-turn directions.</div>')
-        :('<iframe src="https://maps.google.com/maps?q='+_gmQ+'&output=embed&hl=en&z=15"'
+          +'<a href="https://map.baidu.com/search/'+encodeURIComponent(city)+'" target="_blank" style="color:#1677ff;font-weight:600">百度地图 ↗</a> for turn-by-turn directions.</div>';
+      } else if(places.length){
+        // Route: hotel → each attraction → hotel (driving)
+        const _gmO=encodeURIComponent(hotelQ);
+        const _gmStops=places.map(p=>encodeURIComponent(p.name+', '+city+country));
+        const _gmD=_gmStops.join('+to:')+'+to:'+encodeURIComponent(hotelQ);
+        _cityMapHtml='<iframe src="https://maps.google.com/maps?saddr='+_gmO+'&daddr='+_gmD+'&output=embed&hl=en&dirflg=d"'
           +' style="height:300px;width:100%;border:0;display:block"'
-          +' loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>');
+          +' loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>';
+      } else {
+        // No attractions — just centre on the hotel
+        _cityMapHtml='<iframe src="https://maps.google.com/maps?q='+encodeURIComponent(hotelQ)+'&output=embed&hl=en&z=15"'
+          +' style="height:300px;width:100%;border:0;display:block"'
+          +' loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>';
+      }
 
       // Tip note below map
       const _tipHtml=isCN?''
@@ -6696,20 +6708,22 @@ function exportAllToGCal(){
   const ics=icsLines.join(CRLF);
 
   // ── Download ──────────────────────────────────────────────────────────
+  // Use application/octet-stream — forces a file download, never opens a blank browser tab
   const safeName=(tripData.tripName||'trip').replace(/[^a-zA-Z0-9 _-]/g,'').trim().replace(/\s+/g,'_')||'trip';
-  // Use data: URI so the browser downloads the file rather than opening a blank tab
   try{
-    const blob=new Blob([ics],{type:'text/calendar;charset=utf-8'});
+    const blob=new Blob([ics],{type:'application/octet-stream'});
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a');
-    a.href=url;a.download=`${safeName}_calendar.ics`;
+    a.href=url;a.download=safeName+'_calendar.ics';
+    a.style.display='none';
     document.body.appendChild(a);a.click();document.body.removeChild(a);
-    setTimeout(()=>URL.revokeObjectURL(url),8000);
+    setTimeout(()=>URL.revokeObjectURL(url),5000);
   }catch(e){
-    // Fallback: data-URI (always works, even in restrictive browsers / WebViews)
-    const dataUri='data:text/calendar;charset=utf-8,'+encodeURIComponent(ics);
+    // Fallback: data-URI
+    const dataUri='data:application/octet-stream,'+encodeURIComponent(ics);
     const a=document.createElement('a');
-    a.href=dataUri;a.download=`${safeName}_calendar.ics`;
+    a.href=dataUri;a.download=safeName+'_calendar.ics';
+    a.style.display='none';
     document.body.appendChild(a);a.click();document.body.removeChild(a);
   }
 
