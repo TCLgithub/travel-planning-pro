@@ -336,6 +336,80 @@ textarea{resize:vertical;min-height:58px}
 .empty-icon{font-size:2.4rem;margin-bottom:.68rem}
 .empty-title{font-family:'Playfair Display',serif;font-size:1.15rem;color:var(--ink);margin-bottom:.4rem}
 @media print{nav,.main-tabs,.out-acts,.share-panel,.loading,.map-ftr,.btn,.notice-w,.suggest-wrap,.fb-log,.settings-overlay,.transport-legend{display:none!important}.day,.mc{break-inside:avoid}body{background:#fff;font-size:12pt}}
+
+/* ══ MOBILE — comprehensive responsive styles ══════════════════════════ */
+@media(max-width:640px){
+  /* Nav */
+  nav{padding:.45rem .7rem;flex-wrap:wrap;gap:.3rem}
+  .nav-l{font-size:.85rem;gap:.3rem}
+  .nav-l svg{width:20px;height:20px}
+  .nav-r{gap:.25rem}
+  .nav-r button,.nav-r .btn{font-size:.62rem;padding:.28rem .48rem}
+  /* Page */
+  .page-wrap{padding:.65rem .6rem}
+  /* Planning form */
+  .g2,.g3{grid-template-columns:1fr}
+  .form-card{padding:.85rem .9rem}
+  /* Destination rows */
+  .dest-row{flex-wrap:wrap;gap:.25rem}
+  .dest-row .dest-nights{width:70px;min-width:60px}
+  /* Summary bar */
+  .sumbar{grid-template-columns:repeat(2,1fr);font-size:.68rem}
+  /* Big CTA */
+  .generate-btn{font-size:.85rem;padding:.75rem 1rem}
+  /* Output header */
+  .out-hdr{flex-wrap:wrap;gap:.4rem;align-items:flex-start}
+  .out-hdr .trip-name-title{font-size:1.1rem}
+  .out-acts{flex-wrap:wrap;gap:.25rem}
+  .out-acts .btn{font-size:.62rem;padding:.28rem .52rem}
+  /* Tabs */
+  .main-tabs{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:2px}
+  .main-tabs::-webkit-scrollbar{display:none}
+  .main-tabs .tab-btn{white-space:nowrap;font-size:.65rem;padding:.38rem .62rem;flex-shrink:0}
+  /* Day cards */
+  .day-hdr{padding:.48rem .7rem}
+  .day-ttl{font-size:.8rem}
+  .act{padding:.5rem .7rem;gap:.45rem}
+  .act-time{min-width:38px;font-size:.58rem}
+  .act-name{font-size:.74rem}
+  .act-desc{font-size:.67rem}
+  /* Hotels grid */
+  .h-grid{grid-template-columns:1fr 1fr}
+  /* Guide grids */
+  .guide-grid{grid-template-columns:1fr 1fr}
+  .phrase-grid{grid-template-columns:1fr 1fr}
+  .emergency-grid{grid-template-columns:1fr 1fr}
+  /* Budget table — horizontal scroll */
+  .budget-panel{overflow-x:auto}
+  .budget-table{min-width:420px}
+  /* Share panel */
+  .share-row{flex-direction:column}
+  .share-socials{gap:.2rem}
+  /* Map */
+  .map-frame{height:240px}
+  .city-map-iframe{height:220px!important}
+  /* Modals — slide up from bottom on mobile */
+  .modal-box,.settings-drawer{
+    width:100%!important;max-width:100%!important;
+    margin:0;border-radius:12px 12px 0 0;
+    position:fixed;bottom:0;left:0;right:0;
+    max-height:92vh;overflow-y:auto;
+  }
+  .modal-ov{align-items:flex-end!important;padding:0!important}
+  .settings-overlay{align-items:flex-end!important;justify-content:stretch!important}
+  /* Toast — wider on mobile */
+  .toast{left:.7rem;right:.7rem;max-width:none;font-size:.72rem}
+  /* Packing list */
+  .pack-cat-hdr{font-size:.76rem}
+  .pack-item label{font-size:.74rem}
+  /* Weather days */
+  .wx-days-row{gap:.15rem;padding:.4rem .4rem}
+  .wx-day{flex:0 0 52px;padding:.35rem .15rem}
+  /* Sections */
+  .sec-hdr{flex-direction:column;align-items:flex-start;gap:.3rem}
+  /* Form inputs on mobile */
+  input,select,textarea{font-size:16px!important} /* prevent iOS zoom */
+}
 a{color:inherit;text-decoration:none}.muted{color:var(--ink-ll);font-size:.72rem}
 /* ONLINE SHARE MODAL */
 .modal-ov{position:fixed;inset:0;background:rgba(10,8,4,.78);z-index:10000;display:none;align-items:center;justify-content:center;padding:1rem}
@@ -2169,7 +2243,8 @@ function renderItinerary(t){
   $('out-title').textContent=t.tripName||(t.destinations||[]).join(' & ');
   $('out-sub').textContent=`${fmtD(m.start)} → ${fmtD(m.end)}  ·  ${days} day${days>1?'s':''}  ·  ${m.travellers||''}  ·  ${m.flightClass||''} class`;
   $('out-summary').textContent=t.summary||'';
-  $('prov-badge').textContent=`${P_LABELS[m.provider]||'AI'}  ·  ${m.model||''}`;
+  const _modTs=t._savedAt?`  ·  Modified ${_fmtSavedAt(t._savedAt)}`:'';
+  $('prov-badge').textContent=`${P_LABELS[m.provider]||'AI'}  ·  ${m.model||''}${_modTs}`;
 
   $('sumbar').innerHTML=[
     ['Duration',`${days}d`],['Budget',t.totalBudgetEstimate||'—'],
@@ -3333,7 +3408,7 @@ function buildCityMaps(t){
           ${places.map(p=>`<div class="wpt-seg">→</div><div class="wpt">${typeIcon[p.type]||'📍'} ${p.name}</div>`).join('')}
           ${places.length?`<div class="wpt-seg">→</div><div class="wpt" style="color:var(--ink-ll);font-size:.73rem">🏨 return</div>`:''}
         </div>
-        <iframe src="${gmEmbedSrc}" style="height:300px;width:100%;border:none;display:block" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen title="Map — ${city}"></iframe>
+        <iframe src="${gmEmbedSrc}" class="city-map-iframe" style="height:300px;width:100%;border:none;display:block" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen title="Map — ${city}"></iframe>
         ${isCN?`<div style="padding:.45rem .95rem;background:var(--sand);border-top:1px solid var(--border);font-size:.71rem;color:var(--ink-ll)">
           💡 Use <a href="${amapUrl}" target="_blank" style="color:#1677ff;font-weight:600">高德地图 (Amap)</a> or <a href="https://map.baidu.com/search/${encodeURIComponent(city)}" target="_blank" style="color:#1677ff;font-weight:600">百度地图</a> for turn-by-turn directions in China.
         </div>`:''}
@@ -4154,9 +4229,17 @@ async function loadFromURL(){
 }
 
 // ══ SAVE / LOAD ══
+function _fmtSavedAt(iso){
+  if(!iso) return '';
+  try{
+    const d=new Date(iso);
+    return d.toLocaleString('en-GB',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true});
+  }catch{return '';}
+}
 function saveTrip(t){
   const k='tppT_'+Date.now();
   t._saveKey=k;
+  t._savedAt=new Date().toISOString();
   const list=getSavedKeys();list.unshift(k);
   if(list.length>12)list.splice(12).forEach(x=>localStorage.removeItem(x));
   try{localStorage.setItem(k,JSON.stringify(t));localStorage.setItem('tppTrips',JSON.stringify(list));}catch(e){}
@@ -4164,6 +4247,7 @@ function saveTrip(t){
 function updateTrip(t){
   const k=t._saveKey;
   if(!k){saveTrip(t);return;}
+  t._savedAt=new Date().toISOString();
   try{localStorage.setItem(k,JSON.stringify(t));}catch(e){}
 }
 function getSavedKeys(){try{return JSON.parse(localStorage.getItem('tppTrips')||'[]');}catch{return[];}}
@@ -4172,9 +4256,11 @@ function renderSavedList(){
   if(!keys.length){el.innerHTML='<div class="muted" style="padding:.28rem 0">No saved trips yet.</div>';return;}
   el.innerHTML=keys.map(k=>{
     try{const t=JSON.parse(localStorage.getItem(k)||'{}');const m=t._meta||{};
+      const _ts=t._savedAt||new Date(parseInt(k.replace('tppT_',''))||Date.now()).toISOString();
       return `<div class="saved-trip" onclick="loadSaved('${k}');closeSettings()">
         <div class="st-name">${t.tripName||'Trip'}</div>
         <div class="st-meta">${(t.destinations||[]).join(', ')||''} · ${m.days||'?'}d · ${P_LABELS[m.provider]||'AI'}</div>
+        <div class="st-meta" style="color:var(--teal-d);margin-top:.1rem">🕐 Saved ${_fmtSavedAt(_ts)}</div>
         <div class="st-acts">
           <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();loadSaved('${k}');closeSettings()">View</button>
           <button class="btn btn-ghost btn-sm" style="color:var(--gold)" onclick="event.stopPropagation();editSaved('${k}')">✏ Edit</button>
@@ -4545,8 +4631,13 @@ window.addEventListener('DOMContentLoaded',()=>{
   // ?code= param → shared trip via ☁ Online: pre-fill code and open password modal
   const _sharedCode=new URLSearchParams(location.search).get('code');
   if(_sharedCode){
-    if($('lcm-code'))$('lcm-code').value=_sharedCode;
-    openLoadCodeModal();
+    // Pre-fill code THEN open modal manually (openLoadCodeModal() would clear the field)
+    if($('lcm-pw'))$('lcm-pw').value='';
+    if($('lcm-err'))$('lcm-err').style.display='none';
+    if($('lcm-code'))$('lcm-code').value=_sharedCode.trim();
+    $('load-code-modal')?.classList.add('open');
+    // Focus the password field so user can type straight away
+    setTimeout(()=>$('lcm-pw')?.focus(),180);
   } else {
     loadFromURL().then(loaded=>{if(!loaded)loadDemo();});
   }
@@ -6379,16 +6470,22 @@ function exportAllToGCal(){
   const ics=icsLines.join(CRLF);
 
   // ── Download ──────────────────────────────────────────────────────────
-  const blob=new Blob([ics],{type:'text/calendar;charset=utf-8'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url;
   const safeName=(tripData.tripName||'trip').replace(/[^a-zA-Z0-9 _-]/g,'').trim().replace(/\s+/g,'_')||'trip';
-  a.download=`${safeName}_calendar.ics`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(()=>URL.revokeObjectURL(url),5000);
+  // Use data: URI so the browser downloads the file rather than opening a blank tab
+  try{
+    const blob=new Blob([ics],{type:'text/calendar;charset=utf-8'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;a.download=`${safeName}_calendar.ics`;
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url),8000);
+  }catch(e){
+    // Fallback: data-URI (always works, even in restrictive browsers / WebViews)
+    const dataUri='data:text/calendar;charset=utf-8,'+encodeURIComponent(ics);
+    const a=document.createElement('a');
+    a.href=dataUri;a.download=`${safeName}_calendar.ics`;
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+  }
 
   const actCount=(tripData.days||[]).reduce((s,d)=>s+(d.activities||[]).length,0);
   const segCount=(tripData.transportSummary||[]).length;
