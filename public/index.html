@@ -2048,6 +2048,8 @@ FLIGHT TIME RULES:
 - Return >4h: last day = checkout + airport transfer only. Title "Departure Day".
 - Return ≤4h: light morning activities OK on last day.
 
+CITIES: This trip covers ${dests.length} ${dests.length===1?'city':'cities'}: ${dests.map(d=>d.split(',')[0].trim()).join(', ')}. You MUST include ALL of these cities in the itinerary — every city must appear as the "city" field in at least one day entry and one hotel entry. Do NOT skip any city.
+
 IMPORTANT: Set the "currency" field to the official local currency of the PRIMARY destination (e.g. TWD for Taiwan, JPY for Japan, KRW for Korea, THB for Thailand, EUR for Europe, GBP for UK, AUD for Australia, CNY for China, SGD for Singapore, HKD for Hong Kong). NOT MYR, NOT CAD — use the destination's own currency.
 
 CRITICAL: Return ONLY valid JSON. No markdown, no code fences, no text outside JSON.${needsChunks?`
@@ -3303,17 +3305,28 @@ function buildMap(t){
     const firstCity=mapWps[0]||'';
 
     if(_routeIsCN){
-      // China: keep Leaflet/OpenStreetMap — Google Maps is blocked
-      const _lDiv=document.createElement('div');
-      _lDiv.id='map-frame-leaflet';
-      _lDiv.style.cssText='width:100%;height:480px;background:var(--sand-d);z-index:0;position:relative;border-radius:6px;display:block';
-      mapFrame.parentNode.insertBefore(_lDiv,mapFrame);
-      let cityPlaces=mapWps.slice(1).map(w=>({name:w,type:'attraction'}));
-      if(cityPlaces.length===0){
-        const attractions=(t.mustSeeAttractions||[]).slice(0,5).map(a=>({name:a.name,type:'attraction'}));
-        cityPlaces=attractions;
+      // China: Google Maps blocked — show Amap navigation card with per-leg links
+      const _cnDiv=document.createElement('div');
+      _cnDiv.id='map-frame-leaflet';
+      _cnDiv.style.cssText='width:100%;border-radius:6px;display:block;overflow:hidden;border:1px solid var(--border)';
+      // Build per-leg Amap direction links
+      const _legLinks=[];
+      for(let _li=0;_li<mapWps.length-1;_li++){
+        const _from=mapWps[_li],_to=mapWps[_li+1];
+        const _amapLeg='https://www.amap.com/dir?origin[name]='+encodeURIComponent(_from)+'&destination[name]='+encodeURIComponent(_to)+'&type=car&src=travel-pro';
+        _legLinks.push('<a href="'+_amapLeg+'" target="_blank" style="display:inline-flex;align-items:center;gap:.35rem;padding:.45rem .9rem;background:#1677ff;color:#fff;border-radius:6px;font-size:.82rem;font-weight:600;text-decoration:none;white-space:nowrap">🗺 '+_from+' → '+_to+' ↗</a>');
       }
-      _buildLeafletMap('map-frame-leaflet', cityPlaces, firstCity, firstCity, true);
+      // Baidu Maps search for the full trip
+      const _baiduUrl='https://map.baidu.com/search/'+encodeURIComponent(firstCity);
+      _cnDiv.innerHTML='<div style="padding:1.6rem 1.4rem;background:linear-gradient(135deg,#e8f2ff,#f0f7ff);min-height:200px">'
+        +'<div style="font-size:.95rem;font-weight:700;color:#1a3557;margin-bottom:.3rem">🗺 路线导航 Route Navigation</div>'
+        +'<div style="font-size:.75rem;color:#4a6fa5;margin-bottom:1.2rem">Google Maps is not available in mainland China. Use Amap (高德地图) for accurate navigation.</div>'
+        +'<div style="display:flex;flex-wrap:wrap;gap:.6rem;margin-bottom:1.1rem">'+_legLinks.join('')+'</div>'
+        +'<div style="display:flex;gap:.6rem;flex-wrap:wrap">'
+        +'<a href="https://www.amap.com/search?query='+encodeURIComponent(firstCity)+'" target="_blank" style="padding:.4rem .85rem;background:#fff;border:1px solid #1677ff;color:#1677ff;border-radius:6px;font-size:.78rem;font-weight:600;text-decoration:none">🔍 Search Amap ↗</a>'
+        +'<a href="'+_baiduUrl+'" target="_blank" style="padding:.4rem .85rem;background:#fff;border:1px solid #3385ff;color:#3385ff;border-radius:6px;font-size:.78rem;font-weight:600;text-decoration:none">🗺 百度地图 ↗</a>'
+        +'</div></div>';
+      mapFrame.parentNode.insertBefore(_cnDiv,mapFrame);
     } else {
       // Non-China: Google Maps embed (driving route between waypoints)
       let _gmSrc;
@@ -3484,10 +3497,22 @@ function buildCityMaps(t){
       // Build Google Maps route: hotel → attraction1 → attraction2 → ... → hotel
       let _cityMapHtml;
       if(isCN){
-        _cityMapHtml='<div id="'+leafletId+'" style="height:300px;width:100%;background:var(--sand-d);position:relative;z-index:0"></div>'
-          +'<div style="padding:.45rem .95rem;background:var(--sand);border-top:1px solid var(--border);font-size:.71rem;color:var(--ink-ll)">'
-          +'💡 Google Maps is restricted in China. Use 高德地图 (Amap) above, or '
-          +'<a href="https://map.baidu.com/search/'+encodeURIComponent(city)+'" target="_blank" style="color:#1677ff;font-weight:600">百度地图 ↗</a> for turn-by-turn directions.</div>';
+        // China: Amap navigation card — Google Maps blocked, Amap doesn't support free embedding
+        const _cnO=encodeURIComponent(h.name+', '+city);
+        const _cnPlaceLinks=places.map(p=>{
+          const _pl=encodeURIComponent(p.name+', '+city);
+          return '<a href="https://www.amap.com/dir?origin[name]='+_cnO+'&destination[name]='+_pl+'&type=walk&src=travel-pro" target="_blank" style="display:inline-flex;align-items:center;gap:.3rem;padding:.38rem .75rem;background:#1677ff;color:#fff;border-radius:6px;font-size:.76rem;font-weight:600;text-decoration:none;white-space:nowrap">→ '+(p.name.length>18?p.name.slice(0,17)+'…':p.name)+' ↗</a>';
+        }).join('');
+        const _cnSearch='https://www.amap.com/search?query='+encodeURIComponent(city);
+        const _cnBaidu='https://map.baidu.com/search/'+encodeURIComponent(city);
+        _cityMapHtml='<div style="padding:1.2rem 1.1rem;background:linear-gradient(135deg,#e8f2ff,#f0f7ff);border-top:1px solid #c5d8f0;min-height:160px">'
+          +'<div style="font-size:.82rem;font-weight:700;color:#1a3557;margin-bottom:.25rem">🗺 导航 Navigate in '+city+'</div>'
+          +'<div style="font-size:.7rem;color:#4a6fa5;margin-bottom:.8rem">Google Maps unavailable in China — tap below to open Amap (高德地图)</div>'
+          +(places.length?'<div style="display:flex;flex-wrap:wrap;gap:.45rem;margin-bottom:.75rem">'+_cnPlaceLinks+'</div>':'')
+          +'<div style="display:flex;gap:.45rem;flex-wrap:wrap">'
+          +'<a href="'+_cnSearch+'" target="_blank" style="padding:.35rem .75rem;background:#fff;border:1px solid #1677ff;color:#1677ff;border-radius:6px;font-size:.74rem;font-weight:600;text-decoration:none">🔍 搜索 '+city+' ↗</a>'
+          +'<a href="'+_cnBaidu+'" target="_blank" style="padding:.35rem .75rem;background:#fff;border:1px solid #3385ff;color:#3385ff;border-radius:6px;font-size:.74rem;font-weight:600;text-decoration:none">🗺 百度地图 ↗</a>'
+          +'</div></div>';
       } else if(places.length){
         // Route: hotel → each attraction → hotel (driving)
         const _gmO=encodeURIComponent(hotelQ);
@@ -3539,25 +3564,11 @@ function buildCityMaps(t){
   container.innerHTML=cardData.length
     ?`<div class="sec-hdr" style="margin-top:1.2rem">
         <div class="sec-title">🏙 City Maps</div>
-        <div class="muted" style="font-size:.72rem">Route: hotel → attractions → hotel. Tap 🗺 Google Maps ↗ for turn-by-turn directions.</div>
+        <div class="muted" style="font-size:.72rem">Route: hotel → attractions → hotel. Tap the map button for turn-by-turn directions.</div>
       </div>`+cards.join('')
     :'';
 
-  // ── Build Leaflet maps only for China cards (Google Maps is blocked there) ──
-  // All other destinations use the Google Maps ?q= iframe rendered above
-  let cnIdx=0;
-  cardData.forEach(([,d])=>{
-    const h=d.hotel;
-    const city=d.displayCity||h.city||'';
-    const _ctx=city+' '+allDests;
-    if(!CHINA_RE.test(_ctx))return; // Google Maps iframe handles non-CN
-    const places=d.places.slice(0,4);
-    const leafletId=`city-lf-${d.hotelIdx}`;
-    setTimeout(()=>{
-      _buildLeafletMap(leafletId, places, h.name, city, 'loop');
-    }, cnIdx*600); // stagger only CN cards to respect Nominatim rate limit
-    cnIdx++;
-  });
+  // No Leaflet needed: China uses Amap nav cards, non-China uses Google Maps iframes
 }
 
 function changeHotel(idx){
@@ -3773,8 +3784,9 @@ function buildDays(t,total){
 function renderGuide(g){
   const destStr=g?.destination||(tripData?.destinations||[]).join(', ')||tripData?.destination||'';
   const isTaiwan=/taiwan|taipei|kaohsiung|taichung|tainan|hualien/i.test(destStr);
+  const isChina=/\b(china|shanghai|beijing|suzhou|hangzhou|guangzhou|shenzhen|chengdu|nanjing|wuhan|xi.?an|guilin|chongqing|kunming|zhejiang|jiangsu|sichuan|yunnan|guangdong)\b/i.test(destStr);
   // TNG Alipay+ is only available in select Asian countries — not in Canada, USA, Australia, Europe, etc.
-  const isTNGCountry=/japan|tokyo|osaka|kyoto|fukuoka|sapporo|nara|hiroshima|korea|korean|seoul|busan|jeju|incheon|daegu|thailand|bangkok|phuket|chiangmai|chiang mai|chiang rai|philippines|manila|cebu|boracay|palawan|singapore|hong kong|hongkong|macau|macao|indonesia|bali|jakarta|yogyakarta|vietnam|hanoi|ho chi minh|saigon|da nang|hoi an|cambodia|phnom penh|siem reap|myanmar|rangoon|yangon/i.test(destStr);
+  const isTNGCountry=!isChina&&/japan|tokyo|osaka|kyoto|fukuoka|sapporo|nara|hiroshima|korea|korean|seoul|busan|jeju|incheon|daegu|thailand|bangkok|phuket|chiangmai|chiang mai|chiang rai|philippines|manila|cebu|boracay|palawan|singapore|hong kong|hongkong|macau|macao|indonesia|bali|jakarta|yogyakarta|vietnam|hanoi|ho chi minh|saigon|da nang|hoi an|cambodia|phnom penh|siem reap|myanmar|rangoon|yangon/i.test(destStr);
   if(!g&&!tripData){return;}
   $('badge-guide').style.display='inline';
   $('empty-guide').style.display='none';
@@ -3830,7 +3842,31 @@ function renderGuide(g){
           </div>
         </div>
         <div class="guide-section">
-          ${isTaiwan?`
+          ${isChina?`
+          <div class="guide-section-title">💳 Payments in China — Alipay & WeChat Pay</div>
+          <div class="guide-grid">
+            <div class="guide-item">
+              <div class="guide-item-title">📱 Alipay (支付宝) — Essential</div>
+              <div class="guide-item-val">The most widely accepted e-wallet in China — used at restaurants, shops, taxis, attractions and markets. Set up with a foreign Visa/Mastercard in the International version.</div>
+              <div class="guide-item-sub">Download "Alipay" app · Register with your Malaysian mobile number · Add a foreign Visa/Mastercard card · Top up with international card</div>
+            </div>
+            <div class="guide-item">
+              <div class="guide-item-title">💚 WeChat Pay (微信支付) — Essential</div>
+              <div class="guide-item-val">Equal to Alipay in acceptance — nearly every merchant accepts both. Link a foreign Visa/Mastercard to WeChat Pay's "Overseas" feature and pay directly.</div>
+              <div class="guide-item-sub">WeChat app → Me → Pay → Set up · Foreign card linking supported for tourists since 2023</div>
+            </div>
+            <div class="guide-item">
+              <div class="guide-item-title">💵 Cash (RMB / CNY)</div>
+              <div class="guide-item-val">Carry some RMB as backup — smaller towns and older merchants may not accept mobile payments. Withdraw from Bank of China or ICBC ATMs at the airport on arrival.</div>
+              <div class="guide-item-sub">Bank of China ATMs are most reliable for foreign Visa/Mastercard · Most transactions are cashless in cities</div>
+            </div>
+            <div class="guide-item">
+              <div class="guide-item-title">💡 Wise Travel Card</div>
+              <div class="guide-item-val">Useful for ATM withdrawals and as a backup card. Note: card payments at POS terminals are rare in China — mobile payments dominate.</div>
+              <div class="guide-item-sub"><a href="https://wise.com" target="_blank" style="color:var(--teal)">wise.com ↗</a> · Apply 2–3 weeks before travel</div>
+            </div>
+          </div>`
+          :isTaiwan?`
           <div class="guide-section-title">💳 Payments in Taiwan</div>
           <div class="guide-grid">
             <div class="guide-item">
@@ -4005,7 +4041,31 @@ function renderGuide(g){
 
         <!-- ── TNG / Alipay+ Payments ── -->
         <div class="guide-section">
-          ${isTaiwan?`
+          ${isChina?`
+          <div class="guide-section-title">💳 Payments in China — Alipay & WeChat Pay</div>
+          <div class="guide-grid">
+            <div class="guide-item">
+              <div class="guide-item-title">📱 Alipay (支付宝) — Essential</div>
+              <div class="guide-item-val">The most widely accepted e-wallet in China — used at restaurants, shops, taxis, attractions and markets. Set up with a foreign Visa/Mastercard in the International version.</div>
+              <div class="guide-item-sub">Download "Alipay" app · Register with your Malaysian mobile number · Add a foreign Visa/Mastercard card · Top up with international card</div>
+            </div>
+            <div class="guide-item">
+              <div class="guide-item-title">💚 WeChat Pay (微信支付) — Essential</div>
+              <div class="guide-item-val">Equal to Alipay in acceptance — nearly every merchant accepts both. Link a foreign Visa/Mastercard to WeChat Pay's "Overseas" feature and pay directly.</div>
+              <div class="guide-item-sub">WeChat app → Me → Pay → Set up · Foreign card linking supported for tourists since 2023</div>
+            </div>
+            <div class="guide-item">
+              <div class="guide-item-title">💵 Cash (RMB / CNY)</div>
+              <div class="guide-item-val">Carry some RMB as backup — smaller towns and older merchants may not accept mobile payments. Withdraw from Bank of China or ICBC ATMs at the airport on arrival.</div>
+              <div class="guide-item-sub">Bank of China ATMs are most reliable for foreign Visa/Mastercard · Most transactions are cashless in cities</div>
+            </div>
+            <div class="guide-item">
+              <div class="guide-item-title">💡 Wise Travel Card</div>
+              <div class="guide-item-val">Useful for ATM withdrawals and as a backup card. Note: card payments at POS terminals are rare in China — mobile payments dominate.</div>
+              <div class="guide-item-sub"><a href="https://wise.com" target="_blank" style="color:var(--teal)">wise.com ↗</a> · Apply 2–3 weeks before travel</div>
+            </div>
+          </div>`
+          :isTaiwan?`
           <div class="guide-section-title">💳 Payments in Taiwan</div>
           <div class="guide-grid">
             <div class="guide-item">
