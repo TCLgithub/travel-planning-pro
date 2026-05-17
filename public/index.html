@@ -2142,7 +2142,14 @@ CHUNK INSTRUCTION: This trip is ${days} days. Generate ONLY days 1–${chunk1End
       const lastDay=t.days?.[t.days.length-1];
       let prevCity=lastDay?.city||dests[0]?.split(',')[0]||'';
 
-      for(let from=chunk1End+1;from<=days;from+=CHUNK){
+      // Use actual last day returned (not assumed chunk1End) so gaps aren't skipped
+      const actualChunk1End=t.days?.length
+        ?Math.max(...t.days.map(d=>d.dayNumber||0))
+        :chunk1End;
+      if(actualChunk1End<chunk1End)
+        toast(`⚠ AI returned ${actualChunk1End} days in chunk 1 — fetching missing days ${actualChunk1End+1}–${days}…`,5000);
+
+      for(let from=actualChunk1End+1;from<=days;from+=CHUNK){
         const to=Math.min(from+CHUNK-1,days);
         toast(`⏳ Generating days ${from}–${to} of ${days}…`,8000);
         const contPrompt=`Continue a ${days}-day travel itinerary for "${name}".
@@ -3305,28 +3312,43 @@ function buildMap(t){
     const firstCity=mapWps[0]||'';
 
     if(_routeIsCN){
-      // China: Google Maps blocked — show Amap navigation card with per-leg links
-      const _cnDiv=document.createElement('div');
-      _cnDiv.id='map-frame-leaflet';
-      _cnDiv.style.cssText='width:100%;border-radius:6px;display:block;overflow:hidden;border:1px solid var(--border)';
-      // Build per-leg Amap direction links
+      // China: show Leaflet/OSM for visual route overview + Amap nav card below for navigation
+      // Leaflet works globally (OSM tiles are not blocked in China); Google Maps is blocked
+      const _cnWrap=document.createElement('div');
+      _cnWrap.id='map-frame-leaflet';
+      _cnWrap.style.cssText='width:100%;border-radius:6px;display:block;overflow:hidden;border:1px solid var(--border)';
+
+      // Leaflet map div
+      const _lDiv=document.createElement('div');
+      _lDiv.id='map-frame-leaflet-inner';
+      _lDiv.style.cssText='width:100%;height:380px;background:var(--sand-d);z-index:0;position:relative';
+      _cnWrap.appendChild(_lDiv);
+
+      // Amap navigation card beneath the map
       const _legLinks=[];
       for(let _li=0;_li<mapWps.length-1;_li++){
         const _from=mapWps[_li],_to=mapWps[_li+1];
         const _amapLeg='https://www.amap.com/dir?origin[name]='+encodeURIComponent(_from)+'&destination[name]='+encodeURIComponent(_to)+'&type=car&src=travel-pro';
-        _legLinks.push('<a href="'+_amapLeg+'" target="_blank" style="display:inline-flex;align-items:center;gap:.35rem;padding:.45rem .9rem;background:#1677ff;color:#fff;border-radius:6px;font-size:.82rem;font-weight:600;text-decoration:none;white-space:nowrap">🗺 '+_from+' → '+_to+' ↗</a>');
+        _legLinks.push('<a href="'+_amapLeg+'" target="_blank" style="display:inline-flex;align-items:center;gap:.35rem;padding:.42rem .85rem;background:#1677ff;color:#fff;border-radius:6px;font-size:.8rem;font-weight:600;text-decoration:none;white-space:nowrap">🗺 '+_from+' → '+_to+' ↗</a>');
       }
-      // Baidu Maps search for the full trip
-      const _baiduUrl='https://map.baidu.com/search/'+encodeURIComponent(firstCity);
-      _cnDiv.innerHTML='<div style="padding:1.6rem 1.4rem;background:linear-gradient(135deg,#e8f2ff,#f0f7ff);min-height:200px">'
-        +'<div style="font-size:.95rem;font-weight:700;color:#1a3557;margin-bottom:.3rem">🗺 路线导航 Route Navigation</div>'
-        +'<div style="font-size:.75rem;color:#4a6fa5;margin-bottom:1.2rem">Google Maps is not available in mainland China. Use Amap (高德地图) for accurate navigation.</div>'
-        +'<div style="display:flex;flex-wrap:wrap;gap:.6rem;margin-bottom:1.1rem">'+_legLinks.join('')+'</div>'
-        +'<div style="display:flex;gap:.6rem;flex-wrap:wrap">'
-        +'<a href="https://www.amap.com/search?query='+encodeURIComponent(firstCity)+'" target="_blank" style="padding:.4rem .85rem;background:#fff;border:1px solid #1677ff;color:#1677ff;border-radius:6px;font-size:.78rem;font-weight:600;text-decoration:none">🔍 Search Amap ↗</a>'
-        +'<a href="'+_baiduUrl+'" target="_blank" style="padding:.4rem .85rem;background:#fff;border:1px solid #3385ff;color:#3385ff;border-radius:6px;font-size:.78rem;font-weight:600;text-decoration:none">🗺 百度地图 ↗</a>'
-        +'</div></div>';
-      mapFrame.parentNode.insertBefore(_cnDiv,mapFrame);
+      const _navCard=document.createElement('div');
+      _navCard.style.cssText='padding:1rem 1.1rem;background:linear-gradient(135deg,#e8f2ff,#f0f7ff);border-top:1px solid #c5d8f0';
+      _navCard.innerHTML='<div style="font-size:.78rem;font-weight:700;color:#1a3557;margin-bottom:.5rem">🗺 导航 Navigate with Amap — Google Maps unavailable in China</div>'
+        +'<div style="display:flex;flex-wrap:wrap;gap:.45rem;margin-bottom:.5rem">'+_legLinks.join('')+'</div>'
+        +'<div style="display:flex;gap:.45rem;flex-wrap:wrap">'
+        +'<a href="https://www.amap.com/search?query='+encodeURIComponent(firstCity)+'" target="_blank" style="padding:.32rem .7rem;background:#fff;border:1px solid #1677ff;color:#1677ff;border-radius:6px;font-size:.74rem;font-weight:600;text-decoration:none">🔍 Search Amap ↗</a>'
+        +'<a href="https://map.baidu.com/search/'+encodeURIComponent(firstCity)+'" target="_blank" style="padding:.32rem .7rem;background:#fff;border:1px solid #3385ff;color:#3385ff;border-radius:6px;font-size:.74rem;font-weight:600;text-decoration:none">🗺 百度地图 ↗</a>'
+        +'</div>';
+      _cnWrap.appendChild(_navCard);
+      mapFrame.parentNode.insertBefore(_cnWrap,mapFrame);
+
+      // Build Leaflet route map
+      let cityPlaces=mapWps.slice(1).map(w=>({name:w,type:'attraction'}));
+      if(cityPlaces.length===0){
+        const attractions=(t.mustSeeAttractions||[]).slice(0,5).map(a=>({name:a.name,type:'attraction'}));
+        cityPlaces=attractions;
+      }
+      _buildLeafletMap('map-frame-leaflet-inner', cityPlaces, firstCity, firstCity, true);
     } else {
       // Non-China: Google Maps embed (driving route between waypoints)
       let _gmSrc;
@@ -7065,7 +7087,11 @@ ${headerSchema}`;
     // ── Fetch remaining chunks for long trips ──────────────────────────
     if(needsChunks){
       let prevCity=modified.days[modified.days.length-1]?.city||destStr.split(',')[0].trim();
-      for(let from=chunk1End+1;from<=totalDays;from+=CHUNK){
+      // Use actual last day returned so gaps aren't skipped if AI returned fewer than CHUNK days
+      const actualModChunk1End=modified.days.length
+        ?Math.max(...modified.days.map(d=>d.dayNumber||0))
+        :chunk1End;
+      for(let from=actualModChunk1End+1;from<=totalDays;from+=CHUNK){
         const to=Math.min(from+CHUNK-1,totalDays);
         statusEl.textContent=`⏳ Fetching days ${from}–${to}…`;
         const contPrompt=`Continue the modified ${totalDays}-day trip "${tripData.tripName}".
