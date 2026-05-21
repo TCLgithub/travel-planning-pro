@@ -554,6 +554,20 @@ a{color:inherit;text-decoration:none}.muted{color:var(--ink-ll);font-size:.72rem
         <span style="font-size:.62rem;color:var(--ink-ll)">Quick browser check — diagnose CORS / rate limits</span>
       </div>
       <div id="api-test-results" style="font-size:.67rem;line-height:1.85;margin-bottom:.55rem;display:none;background:var(--sand);border-radius:5px;padding:.45rem .65rem;border:1px solid var(--border)"></div>
+      <!-- Google Places API key — for attraction & activity photos -->
+      <div class="sb-section-label">📷 Google Places API <span style="font-size:.58rem;color:var(--ink-ll)">(optional — for attraction photos)</span></div>
+      <div class="key-row">
+        <label style="font-size:.68rem;color:var(--ink-l)">Enables high-quality photos in ⭐ Highlights tab and 📅 Itinerary. Without it, Wikipedia &amp; Unsplash photos are used as fallback.</label>
+        <div class="key-wrap" style="margin-top:.35rem">
+          <input type="password" id="key-google" placeholder="AIzaSy…" oninput="saveGoogleKey()" autocomplete="off" style="font-family:monospace;font-size:.72rem">
+          <button class="eye-btn" onclick="toggleVis('key-google',this)">👁</button>
+        </div>
+        <div class="key-badge" id="badge-google" style="display:none">✓ Saved &nbsp;·&nbsp; <a href="https://console.cloud.google.com/apis/library/places-backend.googleapis.com" target="_blank" style="color:var(--teal)">Google Console ↗</a></div>
+        <div style="margin-top:.4rem;font-size:.63rem;color:var(--ink-ll);line-height:1.6">
+          <strong>How to get a free key:</strong> Google Cloud Console → Enable "Places API (New)" → Create API Key → Restrict to "Places API". Free tier: 5,000 photo requests/month.
+          <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:var(--teal);display:block;margin-top:.2rem">→ Get key at console.cloud.google.com ↗</a>
+        </div>
+      </div>
       <div class="sb-section-label">💾 Key Backup</div>
       <div class="key-file-panel">
         <div class="key-file-title">Export / Import to local file</div>
@@ -729,6 +743,28 @@ a{color:inherit;text-decoration:none}.muted{color:var(--ink-ll);font-size:.72rem
       <button class="tag" onclick="togTag(this)">Near Airport</button>
       <button class="tag" onclick="togTag(this)">Hillside/Mountain View</button>
     </div>
+    <label>Hotel Budget (per night)</label>
+    <div class="tg" id="hotel-budget-tags">
+      <button class="tag" onclick="selTag(this,'hotel-budget-tags')">Budget &lt; MYR 300</button>
+      <button class="tag active" onclick="selTag(this,'hotel-budget-tags')">Mid MYR 300–700</button>
+      <button class="tag" onclick="selTag(this,'hotel-budget-tags')">Upper MYR 700–1500</button>
+      <button class="tag" onclick="selTag(this,'hotel-budget-tags')">Luxury MYR 1500+</button>
+    </div>
+    <label>Minimum Hotel Rating</label>
+    <div class="tg" id="hotel-stars-tags">
+      <button class="tag" onclick="selTag(this,'hotel-stars-tags')">3★ & above</button>
+      <button class="tag active" onclick="selTag(this,'hotel-stars-tags')">4★ & above</button>
+      <button class="tag" onclick="selTag(this,'hotel-stars-tags')">5★ only</button>
+    </div>
+    <label>Hotel Type Preference</label>
+    <div class="tg" id="hotel-type-tags">
+      <button class="tag" onclick="togTag(this)">🏨 City Hotel</button>
+      <button class="tag" onclick="togTag(this)">🌿 Boutique</button>
+      <button class="tag" onclick="togTag(this)">🏖 Resort</button>
+      <button class="tag" onclick="togTag(this)">👨‍👩‍👧 Family-Friendly</button>
+      <button class="tag" onclick="togTag(this)">💼 Business</button>
+      <button class="tag" onclick="togTag(this)">🏯 Heritage/Historic</button>
+    </div>
     <!-- DYNAMIC TRANSPORT (changes by destination) -->
     <label>Mode of Transport <span id="transport-dest-label" style="text-transform:none;font-size:.67rem;color:var(--ink-ll)"></span></label>
     <div class="tg" id="transport-tags">
@@ -865,7 +901,7 @@ a{color:inherit;text-decoration:none}.muted{color:var(--ink-ll);font-size:.72rem
     </div>
     <div id="days-container"></div>
     <!-- Quick-links to dedicated tabs (shown after generation) -->
-    <div id="itin-tab-links" style="display:none;margin-top:1.2rem;display:flex;gap:.55rem;flex-wrap:wrap;padding:.75rem 0 .4rem;border-top:1px solid var(--border)">
+    <div id="itin-tab-links" style="display:none;margin-top:1.2rem;gap:.55rem;flex-wrap:wrap;padding:.75rem 0 .4rem;border-top:1px solid var(--border)">
       <button class="btn btn-ghost btn-sm" onclick="goTab('highlights')" style="color:var(--gold)">⭐ View Highlights →</button>
       <button class="btn btn-ghost btn-sm" onclick="goTab('hotels')">🏨 View Hotels →</button>
     </div>
@@ -1553,6 +1589,18 @@ function saveKey(p){
   if(m)localStorage.setItem('tppM_'+p,m);
   updateBadge(p,k);
 }
+function saveGoogleKey(){
+  const k=$('key-google')?.value?.trim()||'';
+  if(k){
+    localStorage.setItem('tppGoogleKey',k);
+    const b=$('badge-google');
+    if(b)b.style.display='block';
+  } else {
+    localStorage.removeItem('tppGoogleKey');
+    const b=$('badge-google');
+    if(b)b.style.display='none';
+  }
+}
 function loadAllKeys(){
   PROVIDERS.forEach(p=>{
     const k=localStorage.getItem('tppK_'+p)||'';
@@ -1561,6 +1609,10 @@ function loadAllKeys(){
     if($('model-'+p)&&m)$('model-'+p).value=m;
     updateBadge(p,k);
   });
+  // Load Google Places key
+  const gk=localStorage.getItem('tppGoogleKey')||window.TRAVEL_PRO_KEYS?.google||'';
+  if($('key-google'))$('key-google').value=gk;
+  if(gk&&$('badge-google'))$('badge-google').style.display='block';
 }
 async function testAllAPIs(){
   const btn=$('test-apis-btn');const res=$('api-test-results');
@@ -2068,6 +2120,9 @@ async function generateAll(){
   const style=getAct('style-tags');
   const accom=getAct('accom-tags');
   const accomLoc=getAct('accom-loc-tags')||'flexible';
+  const hotelBudget=getAct('hotel-budget-tags')||'Mid MYR 300–700';
+  const hotelStars=getAct('hotel-stars-tags')||'4★ & above';
+  const hotelType=getAct('hotel-type-tags')||'';
   const transport=getAct('transport-tags')||'Flights, Taxi';
   const diet=getAct('diet-tags')||'No restrictions';
   const food=getAct('food-tags')||'Local cuisine';
@@ -2104,6 +2159,7 @@ async function generateAll(){
   const prompt=`You are a world-class travel planner. Create a ${days}-day travel itinerary.
 
 TRIP: ${name} | ${destStr} | ${start}→${end} | ${travellers} | From: ${homeCity} (${flightClass}) | Budget: ${budget} | Style: ${style} | Pace: ${pace} | Accom: ${accom} (${accomLoc}) | Transport: ${transport} | Diet: ${diet} | Food: ${food}${special?` | Special: ${special}`:''}${nightsStr?`\n${nightsStr}`:''}
+HOTEL REQUIREMENTS: Budget ${hotelBudget}/night | Min rating: ${hotelStars}${hotelType?` | Preferred types: ${hotelType}`:''} — select hotels that match these criteria exactly. Reflect the nightly price range in the "pricePerNight" field.
 
 FLIGHT TIME RULES:
 - Outbound >4h from ${homeCity}: Day 1 = arrival only (airport→hotel→dinner). Title "Arrival Day".
@@ -2249,7 +2305,8 @@ CRITICAL: Return ONLY valid JSON — no markdown, no text outside JSON.
     }
 
     tripData={...t,_meta:{start,end,days,travellers,homeCity,flightClass,provider,model,dests,
-      tripName:name,budget,style,accom,accomLoc,transport,diet,food,pace,special,nightsPerCity}};
+      tripName:name,budget,style,accom,accomLoc,transport,diet,food,pace,special,nightsPerCity,
+      hotelBudget,hotelStars,hotelType}};
     // Safety net: if AI returned wrong currency, snap to correct one based on destination
     tripData.currency=_correctCurrency(destStr,tripData.currency);
     saveTrip(tripData);
@@ -2441,43 +2498,66 @@ function buildMustSee(t){
 
 async function loadAttractionPhotos(arr){
   const gKey=localStorage.getItem('tppGoogleKey')||window.TRAVEL_PRO_KEYS?.google||'';
-  arr.forEach(async(a,i)=>{
-    const query=`${a.name||''} ${a.city||''}`.trim();
-    if(!query)return;
-    const img=$('mcph-'+i);
-    if(!img)return;
-    img.onload=()=>{img.style.display='block';const sp=img.parentNode?.querySelector('span');if(sp)sp.style.display='none';};
-    img.onerror=()=>{}; // silently keep emoji if photo fails
 
+  for(let i=0;i<arr.length;i++){
+    const a=arr[i];
+    const name=(a.name||'').trim();
+    const city=(a.city||'').trim();
+    if(!name)continue;
+    const img=$('mcph-'+i);
+    if(!img)continue;
+
+    const showPhoto=src=>{
+      img.onload=()=>{
+        img.style.display='block';
+        const sp=img.parentNode?.querySelector('span');
+        if(sp)sp.style.display='none';
+      };
+      img.onerror=()=>{img.style.display='none';};
+      img.src=src;
+    };
+
+    // 1) Google Places API — best quality, needs API key in Settings
     if(gKey){
-      // Primary: Google Places API (highest quality, needs API key)
       try{
         const r=await fetch('https://places.googleapis.com/v1/places:searchText',{
           method:'POST',
           headers:{'Content-Type':'application/json','X-Goog-Api-Key':gKey,'X-Goog-FieldMask':'places.photos'},
-          body:JSON.stringify({textQuery:query,pageSize:1})
+          body:JSON.stringify({textQuery:name+(city?' '+city:''),pageSize:1})
         });
         const d=await r.json();
-        const photoName=d.places?.[0]?.photos?.[0]?.name;
-        if(photoName){
-          img.src=`https://places.googleapis.com/v1/${photoName}/media?maxWidthPx=480&key=${gKey}`;
-          return;
-        }
+        const pn=d.places?.[0]?.photos?.[0]?.name;
+        if(pn){showPhoto(`https://places.googleapis.com/v1/${pn}/media?maxWidthPx=480&key=${gKey}`);continue;}
       }catch(e){}
     }
-    // Fallback: Wikimedia Commons — free, stable, no API key needed
+
+    // 2) Wikipedia REST Summary — free, CORS-enabled, real photos for major landmarks
     try{
-      const wmQuery=encodeURIComponent(a.name||query);
-      const wmUrl='https://en.wikipedia.org/w/api.php?action=query&titles='+wmQuery+'&prop=pageimages&format=json&pithumbsize=480&origin=*';
-      const wr=await fetch(wmUrl);
-      const wd=await wr.json();
-      const pages=wd.query?.pages||{};
-      const page=Object.values(pages)[0];
-      if(page?.thumbnail?.source){img.src=page.thumbnail.source;return;}
+      // Try exact name first, then name+city
+      for(const q of[name,name+' '+city]){
+        const r=await fetch('https://en.wikipedia.org/api/rest_v1/page/summary/'+encodeURIComponent(q),{headers:{Accept:'application/json'}});
+        if(!r.ok)continue;
+        const d=await r.json();
+        if(d.thumbnail?.source){showPhoto(d.thumbnail.source);break;}
+      }
+      if(img.src&&img.src!==location.href)continue;
     }catch(e){}
-    // Last resort: Unsplash Source (no API key, random relevant photo)
-    img.src='https://source.unsplash.com/480x300/?'+encodeURIComponent((a.name||'')+','+(a.city||''));
-  });
+
+    // 3) Wikimedia Commons API — broader coverage than Wikipedia REST
+    try{
+      const url='https://en.wikipedia.org/w/api.php?action=query&titles='+encodeURIComponent(name)+'&prop=pageimages&format=json&pithumbsize=480&origin=*';
+      const r=await fetch(url);
+      const d=await r.json();
+      const page=Object.values(d.query?.pages||{})[0];
+      if(page?.thumbnail?.source){showPhoto(page.thumbnail.source);continue;}
+    }catch(e){}
+
+    // 4) Unsplash Source — free, no key, random contextual photo
+    showPhoto('https://source.unsplash.com/480x300/?'+encodeURIComponent(name+(city?','+city:'')));
+
+    // Stagger requests to avoid rate limits
+    await new Promise(r=>setTimeout(r,120));
+  }
 }
 
 async function loadItinPhotos(t){
@@ -4809,6 +4889,9 @@ function restoreForm(m,tripNameFallback){
   restoreTags('style-tags',m.style);
   restoreTags('accom-tags',m.accom);
   restoreTags('accom-loc-tags',m.accomLoc);
+  if(m.hotelBudget)restoreTags('hotel-budget-tags',m.hotelBudget);
+  if(m.hotelStars)restoreTags('hotel-stars-tags',m.hotelStars);
+  if(m.hotelType)restoreTags('hotel-type-tags',m.hotelType);
   restoreTags('transport-tags',m.transport);
   restoreTags('diet-tags',m.diet);
   restoreTags('food-tags',m.food);
