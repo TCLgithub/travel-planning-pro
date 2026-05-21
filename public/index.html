@@ -461,7 +461,7 @@ a{color:inherit;text-decoration:none}.muted{color:var(--ink-ll);font-size:.72rem
       <button class="close-btn" onclick="closeSettings()">✕</button>
     </div>
 
-    <!-- Netlify proxy mode banner (shown dynamically by JS) -->
+    <!-- Proxy mode banner (shown dynamically by JS when running on Render/server) -->
     <div id="netlify-mode-banner" style="display:none;background:linear-gradient(135deg,#0e4429,#186534);border:1px solid #2ea043;border-radius:7px;padding:.65rem .85rem;margin-bottom:.7rem">
       <div style="font-size:.74rem;font-weight:700;color:#7dd87d;margin-bottom:.22rem">☁ Proxy Mode — No API Keys Needed</div>
       <div style="font-size:.67rem;color:rgba(200,255,200,.75);line-height:1.55">
@@ -554,20 +554,6 @@ a{color:inherit;text-decoration:none}.muted{color:var(--ink-ll);font-size:.72rem
         <span style="font-size:.62rem;color:var(--ink-ll)">Quick browser check — diagnose CORS / rate limits</span>
       </div>
       <div id="api-test-results" style="font-size:.67rem;line-height:1.85;margin-bottom:.55rem;display:none;background:var(--sand);border-radius:5px;padding:.45rem .65rem;border:1px solid var(--border)"></div>
-      <!-- Google Places API key — for attraction & activity photos -->
-      <div class="sb-section-label">📷 Google Places API <span style="font-size:.58rem;color:var(--ink-ll)">(optional — for attraction photos)</span></div>
-      <div class="key-row">
-        <label style="font-size:.68rem;color:var(--ink-l)">Enables high-quality photos in ⭐ Highlights tab and 📅 Itinerary. Without it, Wikipedia &amp; Unsplash photos are used as fallback.</label>
-        <div class="key-wrap" style="margin-top:.35rem">
-          <input type="password" id="key-google" placeholder="AIzaSy…" oninput="saveGoogleKey()" autocomplete="off" style="font-family:monospace;font-size:.72rem">
-          <button class="eye-btn" onclick="toggleVis('key-google',this)">👁</button>
-        </div>
-        <div class="key-badge" id="badge-google" style="display:none">✓ Saved &nbsp;·&nbsp; <a href="https://console.cloud.google.com/apis/library/places-backend.googleapis.com" target="_blank" style="color:var(--teal)">Google Console ↗</a></div>
-        <div style="margin-top:.4rem;font-size:.63rem;color:var(--ink-ll);line-height:1.6">
-          <strong>How to get a free key:</strong> Google Cloud Console → Enable "Places API (New)" → Create API Key → Restrict to "Places API". Free tier: 5,000 photo requests/month.
-          <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:var(--teal);display:block;margin-top:.2rem">→ Get key at console.cloud.google.com ↗</a>
-        </div>
-      </div>
       <div class="sb-section-label">💾 Key Backup</div>
       <div class="key-file-panel">
         <div class="key-file-title">Export / Import to local file</div>
@@ -580,6 +566,21 @@ a{color:inherit;text-decoration:none}.muted{color:var(--ink-ll);font-size:.72rem
       </div>
     </div><!-- /#api-keys-section -->
 
+    <!-- Google Places API key — always visible, even in Proxy Mode -->
+    <div class="sb-section-label">📷 Google Places API <span style="font-size:.58rem;color:var(--ink-ll)">(optional — for attraction photos)</span></div>
+    <div class="key-file-panel">
+      <label style="font-size:.68rem;color:var(--ink-l)">Enables high-quality photos in ⭐ Highlights tab and 📅 Itinerary. Without it, Wikipedia &amp; Unsplash photos are used as fallback.</label>
+      <div class="key-wrap" style="margin-top:.35rem">
+        <input type="password" id="key-google" placeholder="AIzaSy…" oninput="saveGoogleKey()" autocomplete="off" style="font-family:monospace;font-size:.72rem">
+        <button class="eye-btn" onclick="toggleVis('key-google',this)">👁</button>
+      </div>
+      <div class="key-badge" id="badge-google" style="display:none;margin-top:.3rem">✓ Saved &nbsp;·&nbsp; <a href="https://console.cloud.google.com/apis/library/places-backend.googleapis.com" target="_blank" style="color:var(--teal)">Google Console ↗</a></div>
+      <div style="margin-top:.45rem;font-size:.63rem;color:var(--ink-ll);line-height:1.6">
+        <strong>How to get a free key:</strong> Google Cloud Console → Enable "Places API (New)" → Create API Key → Restrict to "Places API (New)". Free tier: 5,000 photo requests/month.
+        <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:var(--teal);display:block;margin-top:.2rem">→ Get key at console.cloud.google.com ↗</a>
+      </div>
+    </div>
+
     <div class="sb-section-label">📤 Share This App</div>
     <div class="key-file-panel">
       <div class="key-file-title">Send the app to a friend</div>
@@ -589,7 +590,7 @@ a{color:inherit;text-decoration:none}.muted{color:var(--ink-ll);font-size:.72rem
         <button class="btn btn-ghost btn-sm" onclick="copyAppLink()">🔗 Copy File Link</button>
       </div>
       <div style="margin-top:.55rem;padding:.5rem .65rem;background:rgba(125,216,125,.07);border:1px solid rgba(125,216,125,.2);border-radius:5px;font-size:.67rem;color:var(--ink-ll)">
-        ☁ <strong style="color:#7dd87d">Want to share without API keys?</strong> Deploy to Netlify using the <code>netlify-deploy/</code> folder. See <code>README.md</code> for step-by-step instructions.
+        ☁ <strong style="color:#7dd87d">Want to share without API keys?</strong> Deploy to Render.com as a static site — upload <code>index.html</code> and add your API keys as environment variables in the Render dashboard.
       </div>
     </div>
     <div class="sb-section-label">☁ Online Share</div>
@@ -622,7 +623,7 @@ a{color:inherit;text-decoration:none}.muted{color:var(--ink-ll);font-size:.72rem
       • Fallback: Gemini → DeepSeek → Claude → OpenAI<br>
       • Type destination → see attraction chips instantly<br>
       • Local Guide tab shows practical travel info<br>
-      • Deploy to Netlify to share without exposing API keys
+      • Deploy to Render.com to share without exposing API keys
     </div>
   </div>
 </div>
@@ -2001,7 +2002,7 @@ async function callWithFallback(prompt,validate=null){
     }
   }
   const detail=PROVIDERS.filter(p=>errors[p]&&errors[p]!=='no key').map(p=>`${P_LABELS[p]}: ${errors[p]}`).join(' | ');
-  const hint=NETLIFY_MODE?' Check server environment variables in Netlify dashboard.':' Check API keys in ⚙ Settings.';
+  const hint=NETLIFY_MODE?' Check server environment variables in Render dashboard.':' Check API keys in ⚙ Settings.';
   throw new Error('All providers failed.'+(detail?' ('+detail+')':hint));
 }
 
@@ -2324,7 +2325,7 @@ CRITICAL: Return ONLY valid JSON — no markdown, no text outside JSON.
     $('empty-itin-icon').textContent='⚠';
     $('empty-itin-title').textContent='Generation failed';
     $('empty-itin-msg').textContent=NETLIFY_MODE
-      ? 'Generation failed — check server environment variables in Render/Netlify dashboard, then try again.'
+      ? 'Generation failed — check server environment variables in Render dashboard, then try again.'
       : 'Check your API keys in ⚙ Settings and internet connection, then try again.';
     const errDiv=$('empty-itin-err');
     errDiv.textContent=err.message;
