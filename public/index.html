@@ -444,6 +444,8 @@ a{color:inherit;text-decoration:none}.muted{color:var(--ink-ll);font-size:.72rem
 <div class="main-tabs">
   <div class="main-tab active" id="tab-plan" onclick="goTab('plan')">✏ Plan Trip</div>
   <div class="main-tab" id="tab-itin" onclick="goTab('itin')">📅 Itinerary <span class="tab-badge" id="badge-itin" style="display:none">✓</span></div>
+  <div class="main-tab" id="tab-highlights" onclick="goTab('highlights')">⭐ Highlights <span class="tab-badge" id="badge-highlights" style="display:none">✓</span></div>
+  <div class="main-tab" id="tab-hotels" onclick="goTab('hotels')">🏨 Hotels <span class="tab-badge" id="badge-hotels" style="display:none">✓</span></div>
   <div class="main-tab" id="tab-map" onclick="goTab('map')">🗺 Map <span class="tab-badge" id="badge-map" style="display:none">✓</span></div>
   <div class="main-tab" id="tab-guide" onclick="goTab('guide')">📖 Local Guide <span class="tab-badge" id="badge-guide" style="display:none">✓</span></div>
   <div class="main-tab" id="tab-budget" onclick="goTab('budget')">💰 Budget <span class="tab-badge" id="badge-budget" style="display:none">✓</span></div>
@@ -862,16 +864,10 @@ a{color:inherit;text-decoration:none}.muted{color:var(--ink-ll);font-size:.72rem
       <button class="btn btn-sm" style="background:var(--gold);color:var(--ink);font-weight:600" onclick="toggleItinEdit()">✓ Done</button>
     </div>
     <div id="days-container"></div>
-    <div class="mustsee-panel" id="mustsee-panel" style="display:none;margin-top:1.1rem">
-      <div class="mustsee-hdr">
-        <div class="mustsee-hdr-title">⭐ Must-See Attractions</div>
-        <div class="muted" style="color:rgba(240,200,122,.42);font-size:.62rem">AI-curated</div>
-      </div>
-      <div class="ms-grid" id="ms-grid"></div>
-    </div>
-    <div id="hotels-sec" style="margin-top:.6rem">
-      <div class="sec-hdr"><div class="sec-title">🏨 Recommended Stays</div></div>
-      <div class="h-grid" id="hotels-grid"></div>
+    <!-- Quick-links to dedicated tabs (shown after generation) -->
+    <div id="itin-tab-links" style="display:none;margin-top:1.2rem;display:flex;gap:.55rem;flex-wrap:wrap;padding:.75rem 0 .4rem;border-top:1px solid var(--border)">
+      <button class="btn btn-ghost btn-sm" onclick="goTab('highlights')" style="color:var(--gold)">⭐ View Highlights →</button>
+      <button class="btn btn-ghost btn-sm" onclick="goTab('hotels')">🏨 View Hotels →</button>
     </div>
     <div class="share-panel" id="share-panel">
       <div class="share-title">🔗 Share Your Trip Plan</div>
@@ -891,6 +887,64 @@ a{color:inherit;text-decoration:none}.muted{color:var(--ink-ll);font-size:.72rem
         <button class="btn btn-primary btn-sm" onclick="loadByCode()">Load</button>
       </div>
       <div style="font-size:.64rem;color:rgba(240,200,122,.5);line-height:1.5">Ask the sender for both the code and password separately.</div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ══ HIGHLIGHTS TAB ══ -->
+<div class="tab-panel" id="panel-highlights">
+<div class="page-wrap">
+  <div class="empty-state" id="empty-highlights">
+    <div class="empty-icon">⭐</div>
+    <div class="empty-title">No highlights yet</div>
+    <div class="muted">Generate your itinerary to see curated must-see attractions.</div>
+    <button class="btn btn-primary" style="margin-top:1.1rem" onclick="goTab('plan')">← Back to Plan Trip</button>
+  </div>
+  <div id="highlights-content" style="display:none">
+    <div class="out-hdr" style="margin-bottom:.6rem">
+      <div>
+        <div class="out-title" id="highlights-trip-title"></div>
+        <div style="font-size:.74rem;color:var(--ink-ll);margin-top:.18rem">AI-curated must-see attractions with photos, tips &amp; booking links</div>
+      </div>
+      <div class="out-acts">
+        <button class="btn btn-ghost btn-sm" onclick="goTab('itin')">← Itinerary</button>
+        <button class="pdf-btn" onclick="printTab('highlights')">📥 PDF</button>
+      </div>
+    </div>
+    <div class="mustsee-panel" id="mustsee-panel" style="margin-top:0">
+      <div class="mustsee-hdr">
+        <div class="mustsee-hdr-title">⭐ Must-See Attractions</div>
+        <div class="muted" style="color:rgba(240,200,122,.42);font-size:.62rem">AI-curated · tap photo to open Google Maps</div>
+      </div>
+      <div class="ms-grid" id="ms-grid"></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ══ HOTELS TAB ══ -->
+<div class="tab-panel" id="panel-hotels">
+<div class="page-wrap">
+  <div class="empty-state" id="empty-hotels">
+    <div class="empty-icon">🏨</div>
+    <div class="empty-title">No hotels yet</div>
+    <div class="muted">Generate your itinerary to see recommended stays.</div>
+    <button class="btn btn-primary" style="margin-top:1.1rem" onclick="goTab('plan')">← Back to Plan Trip</button>
+  </div>
+  <div id="hotels-content" style="display:none">
+    <div class="out-hdr" style="margin-bottom:.6rem">
+      <div>
+        <div class="out-title" id="hotels-trip-title"></div>
+        <div style="font-size:.74rem;color:var(--ink-ll);margin-top:.18rem">Recommended hotels — tap ✏ Change Hotel to swap to your preferred property</div>
+      </div>
+      <div class="out-acts">
+        <button class="btn btn-ghost btn-sm" onclick="goTab('itin')">← Itinerary</button>
+        <button class="pdf-btn" onclick="printTab('hotels')">📥 PDF</button>
+      </div>
+    </div>
+    <div id="hotels-sec">
+      <div class="h-grid" id="hotels-grid"></div>
     </div>
   </div>
 </div>
@@ -1395,8 +1449,17 @@ function startNewTrip(){
   $('days-container').innerHTML='';
   $('ms-grid').innerHTML='';
   $('hotels-grid').innerHTML='';
-  $('hotels-sec').style.display='none';
   $('day-summary-strip').style.display='none';
+  // Reset Highlights tab
+  if($('highlights-content'))$('highlights-content').style.display='none';
+  if($('empty-highlights'))$('empty-highlights').style.display='flex';
+  $('badge-highlights').style.display='none';
+  // Reset Hotels tab
+  if($('hotels-content'))$('hotels-content').style.display='none';
+  if($('empty-hotels'))$('empty-hotels').style.display='flex';
+  $('badge-hotels').style.display='none';
+  // Hide itinerary tab quick-links
+  if($('itin-tab-links'))$('itin-tab-links').style.display='none';
   $('sumbar').innerHTML='';
   $('flight-tip-el').innerHTML='';
   // Clear form fields
@@ -1438,7 +1501,7 @@ function startNewTrip(){
 
 // ══ TABS ══
 function goTab(t){
-  ['plan','itin','map','guide','budget','weather','pack'].forEach(id=>{
+  ['plan','itin','highlights','hotels','map','guide','budget','weather','pack'].forEach(id=>{
     $('tab-'+id)?.classList.toggle('active',id===t);
     $('panel-'+id)?.classList.toggle('active',id===t);
   });
@@ -2050,6 +2113,15 @@ FLIGHT TIME RULES:
 
 CITIES: This trip covers ${dests.length} ${dests.length===1?'city':'cities'}: ${dests.map(d=>d.split(',')[0].trim()).join(', ')}. You MUST include ALL of these cities in the itinerary — every city must appear as the "city" field in at least one day entry and one hotel entry. Do NOT skip any city.
 
+ITINERARY OPTIMISATION — follow these rules for every day:
+1. GEOGRAPHIC SEQUENCING: Arrange attractions in a logical geographic order to minimise unnecessary travel. Group nearby attractions together. Avoid backtracking (e.g. do not go north then south then north again).
+2. NO DUPLICATES: Never repeat the same attraction or restaurant across different days.
+3. REALISTIC PACING: Factor in opening hours — museums often close Mon/Tue, temples open early, night markets open from 17:00. Space activities with travel time (add 20–30 min travel buffer between distant sites).
+4. MEAL TYPES — strictly differentiate:
+   - Lunch: casual, convenient, fast — local hawker stalls, café, street food, quick noodle/rice meals near attractions.
+   - Dinner: experience-focused — signature local cuisine, rooftop dining, famous restaurant, scenic or atmospheric spot. Higher quality than lunch.
+5. TRANSPORT WARNINGS: If a destination is a national park or protected area where private cars are NOT permitted (e.g. Zion, Bryce Canyon, Taroko, most national park interiors), specify "type":"transport" activity with instructions on the required shuttle bus, park bus, or cable car — do NOT recommend rental car access inside the park.
+
 IMPORTANT: Set the "currency" field to the official local currency of the PRIMARY destination (e.g. TWD for Taiwan, JPY for Japan, KRW for Korea, THB for Thailand, EUR for Europe, GBP for UK, AUD for Australia, CNY for China, SGD for Singapore, HKD for Hong Kong). NOT MYR, NOT CAD — use the destination's own currency.
 
 CRITICAL: Return ONLY valid JSON. No markdown, no code fences, no text outside JSON.${needsChunks?`
@@ -2160,6 +2232,9 @@ Previous day ended in: ${prevCity}
 
 Generate ONLY days ${from} through ${to}. Day ${from} date = ${dateOfDay(from)}, Day ${to} date = ${dateOfDay(to)}.
 Continue logically from day ${from-1}. Keep same pace, style and hotel sequence.
+Group attractions geographically — no backtracking. No duplicate attractions from earlier days.
+Lunch = casual local food near attractions. Dinner = quality experience restaurant.
+Warn if entering national park areas where private cars are not permitted — specify shuttle/bus.
 
 CRITICAL: Return ONLY valid JSON — no markdown, no text outside JSON.
 {"days":[{"dayNumber":${from},"date":"${dateOfDay(from)}","title":"string","theme":"emoji Theme","city":"string","activities":[{"time":"09:00","name":"string",${isChinese?'"nameZh":"中文",':''}"description":"One sentence.","type":"attraction","emoji":"🏔","transport":"...","googleMapsUrl":"https://www.google.com/maps/search/?api=1&query=place","estimatedCost":"MYR 20","duration":"2h"}]}]}`;
@@ -2298,6 +2373,7 @@ function renderItinerary(t){
   $('empty-itin').style.display='none';
   $('itin-content').style.display='block';
   $('badge-itin').style.display='inline';
+  if($('itin-tab-links'))$('itin-tab-links').style.display='flex';
 
   $('out-title').textContent=t.tripName||(t.destinations||[]).join(' & ');
   $('out-sub').textContent=`${fmtD(m.start)} → ${fmtD(m.end)}  ·  ${days} day${days>1?'s':''}  ·  ${m.travellers||''}  ·  ${m.flightClass||''} class`;
@@ -2320,8 +2396,20 @@ function renderItinerary(t){
 function buildMustSee(t){
   const panel=$('mustsee-panel');
   const arr=t.mustSeeAttractions||[];
-  if(!arr.length){panel.style.display='none';return;}
-  panel.style.display='block';
+  // Show/hide Highlights tab
+  const emptyHL=$('empty-highlights'),contentHL=$('highlights-content');
+  if(!arr.length){
+    if(panel)panel.style.display='none';
+    if(emptyHL)emptyHL.style.display='flex';
+    if(contentHL)contentHL.style.display='none';
+    $('badge-highlights').style.display='none';
+    return;
+  }
+  if(emptyHL)emptyHL.style.display='none';
+  if(contentHL)contentHL.style.display='block';
+  if($('highlights-trip-title'))$('highlights-trip-title').textContent=t.tripName||'';
+  $('badge-highlights').style.display='inline';
+  if(panel)panel.style.display='block';
   const destStr=(t.destinations||[]).join(', ');
   $('ms-grid').innerHTML=arr.map((a,i)=>`<div class="mc">
     <div class="mc-photo-wrap" id="mcpw-${i}" data-query="${(a.name||'').replace(/"/g,'')} ${(a.city||'').replace(/"/g,'')}">
@@ -2353,26 +2441,42 @@ function buildMustSee(t){
 
 async function loadAttractionPhotos(arr){
   const gKey=localStorage.getItem('tppGoogleKey')||window.TRAVEL_PRO_KEYS?.google||'';
-  if(!gKey)return;
   arr.forEach(async(a,i)=>{
     const query=`${a.name||''} ${a.city||''}`.trim();
     if(!query)return;
+    const img=$('mcph-'+i);
+    if(!img)return;
+    img.onload=()=>{img.style.display='block';const sp=img.parentNode?.querySelector('span');if(sp)sp.style.display='none';};
+    img.onerror=()=>{}; // silently keep emoji if photo fails
+
+    if(gKey){
+      // Primary: Google Places API (highest quality, needs API key)
+      try{
+        const r=await fetch('https://places.googleapis.com/v1/places:searchText',{
+          method:'POST',
+          headers:{'Content-Type':'application/json','X-Goog-Api-Key':gKey,'X-Goog-FieldMask':'places.photos'},
+          body:JSON.stringify({textQuery:query,pageSize:1})
+        });
+        const d=await r.json();
+        const photoName=d.places?.[0]?.photos?.[0]?.name;
+        if(photoName){
+          img.src=`https://places.googleapis.com/v1/${photoName}/media?maxWidthPx=480&key=${gKey}`;
+          return;
+        }
+      }catch(e){}
+    }
+    // Fallback: Wikimedia Commons — free, stable, no API key needed
     try{
-      const r=await fetch('https://places.googleapis.com/v1/places:searchText',{
-        method:'POST',
-        headers:{'Content-Type':'application/json','X-Goog-Api-Key':gKey,'X-Goog-FieldMask':'places.photos'},
-        body:JSON.stringify({textQuery:query,pageSize:1})
-      });
-      const d=await r.json();
-      const photoName=d.places?.[0]?.photos?.[0]?.name;
-      if(photoName){
-        const img=$('mcph-'+i);
-        if(!img)return;
-        img.onload=()=>{img.style.display='block';};
-        img.onerror=()=>{img.remove();};
-        img.src=`https://places.googleapis.com/v1/${photoName}/media?maxWidthPx=480&key=${gKey}`;
-      }
+      const wmQuery=encodeURIComponent(a.name||query);
+      const wmUrl='https://en.wikipedia.org/w/api.php?action=query&titles='+wmQuery+'&prop=pageimages&format=json&pithumbsize=480&origin=*';
+      const wr=await fetch(wmUrl);
+      const wd=await wr.json();
+      const pages=wd.query?.pages||{};
+      const page=Object.values(pages)[0];
+      if(page?.thumbnail?.source){img.src=page.thumbnail.source;return;}
     }catch(e){}
+    // Last resort: Unsplash Source (no API key, random relevant photo)
+    img.src='https://source.unsplash.com/480x300/?'+encodeURIComponent((a.name||'')+','+(a.city||''));
   });
 }
 
@@ -3626,10 +3730,17 @@ function changeHotel(idx){
   toast(`✓ Hotel updated to "${trimmed}" — all details refreshed`);
 }
 function buildHotels(t){
-  const sec=$('hotels-sec');
-  if(!sec)return;
-  if(!t.hotels?.length){sec.style.display='none';return;}
-  sec.style.display='block';
+  const emptyH=$('empty-hotels'),contentH=$('hotels-content');
+  if(!t.hotels?.length){
+    if(emptyH)emptyH.style.display='flex';
+    if(contentH)contentH.style.display='none';
+    $('badge-hotels').style.display='none';
+    return;
+  }
+  if(emptyH)emptyH.style.display='none';
+  if(contentH)contentH.style.display='block';
+  if($('hotels-trip-title'))$('hotels-trip-title').textContent=t.tripName||'';
+  $('badge-hotels').style.display='inline';
   $('hotels-grid').innerHTML=t.hotels.map((h,idx)=>`<div class="h-card">
     <div class="h-thumb">${h.emoji||'🏨'}</div>
     <div class="h-body">
@@ -4608,8 +4719,24 @@ function loadSaved(key){
       if(r.daysCount)$('days-count').textContent=r.daysCount;
       if(r.daySummary){$('day-summary-list').innerHTML=r.daySummary;$('day-summary-strip').style.display='block';}
       if(r.days)$('days-container').innerHTML=r.days;
-      if(r.mustsee){$('ms-grid').innerHTML=r.mustsee;$('mustsee-panel').style.display=r.msPanel?'block':'none';}
-      if(r.hotels)$('hotels-grid').innerHTML=r.hotels;
+      if(r.mustsee){
+        $('ms-grid').innerHTML=r.mustsee;
+        if(r.msPanel){
+          $('mustsee-panel').style.display='block';
+          if($('highlights-content'))$('highlights-content').style.display='block';
+          if($('empty-highlights'))$('empty-highlights').style.display='none';
+          if($('highlights-trip-title'))$('highlights-trip-title').textContent=t.tripName||'';
+          $('badge-highlights').style.display='inline';
+        }
+      }
+      if(r.hotels){
+        $('hotels-grid').innerHTML=r.hotels;
+        if($('hotels-content'))$('hotels-content').style.display='block';
+        if($('empty-hotels'))$('empty-hotels').style.display='none';
+        if($('hotels-trip-title'))$('hotels-trip-title').textContent=t.tripName||'';
+        $('badge-hotels').style.display='inline';
+      }
+      if($('itin-tab-links'))$('itin-tab-links').style.display='flex';
       // Guide
       if(r.guideVis&&r.guide){
         $('empty-guide').style.display='none';
