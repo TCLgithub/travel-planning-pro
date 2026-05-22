@@ -158,6 +158,13 @@ textarea{resize:vertical;min-height:58px}
 .out-summary{margin-top:.35rem;font-size:.76rem;color:var(--ink-l);line-height:1.6;max-width:510px}
 .prov-badge{font-size:.59rem;padding:.1rem .42rem;background:rgba(196,134,43,.12);border:1px solid var(--border);border-radius:8px;color:var(--ink-ll);display:inline-flex;align-items:center;gap:.18rem;margin-top:.28rem}
 .out-acts{display:flex;gap:.3rem;flex-wrap:wrap;align-items:flex-start}
+/* ── Action dropdown buttons ── */
+.act-dropdown{position:relative;display:inline-block}
+.act-drop-btn{position:relative}
+.act-drop-menu{display:none;position:absolute;top:calc(100% + 4px);left:0;min-width:170px;background:var(--card);border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.18);z-index:120;padding:.25rem 0;white-space:nowrap}
+.act-drop-menu button{display:block;width:100%;text-align:left;background:none;border:none;padding:.52rem .9rem;font-size:.77rem;color:var(--ink);cursor:pointer;line-height:1.3;font-family:inherit}
+.act-drop-menu button:hover{background:rgba(196,134,43,.12);color:var(--gold-l)}
+.act-dropdown.open .act-drop-menu{display:block}
 /* SUMBAR */
 .sumbar{display:grid;grid-template-columns:repeat(5,1fr);gap:.52rem;margin-bottom:1.1rem}
 @media(max-width:600px){.sumbar{grid-template-columns:repeat(2,1fr)}}
@@ -186,7 +193,8 @@ textarea{resize:vertical;min-height:58px}
 .hl-card{display:flex;border-bottom:1px solid var(--border);overflow:hidden;min-height:0}
 .hl-card:last-child{border-bottom:none}
 .hl-body{flex:1;padding:1rem 1.1rem;display:flex;flex-direction:column;gap:.3rem;min-width:0}
-.hl-photo-wrap{width:200px;min-width:200px;height:200px;background:var(--sand-d);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:2.5rem;flex-shrink:0;background-size:cover;background-position:center;background-repeat:no-repeat}
+.hl-photo-col{display:flex;flex-direction:column;flex-shrink:0;width:190px;gap:2px}
+.hl-photo-wrap{width:190px;min-width:190px;height:150px;background:var(--sand-d);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:2rem;flex-shrink:0;background-size:cover;background-position:center;background-repeat:no-repeat}
 .hl-photo{display:none}/* hidden — bg-image used instead */
 .hl-day-meta{display:flex;align-items:center;gap:.45rem;flex-wrap:wrap}
 .hl-day-num{font-size:.65rem;font-weight:700;background:var(--ink);color:var(--gold-l);padding:.13rem .45rem;border-radius:99px;letter-spacing:.02em}
@@ -200,7 +208,7 @@ textarea{resize:vertical;min-height:58px}
 .hl-tip{font-size:.72rem;color:#92400e;background:#fffbeb;border-left:2px solid #f59e0b;padding:.28rem .55rem;border-radius:0 4px 4px 0;line-height:1.5}
 .hl-facts{display:flex;flex-wrap:wrap;gap:.35rem .7rem;font-size:.67rem;color:var(--ink-l);margin-top:.05rem}
 .hl-btns{display:flex;flex-wrap:wrap;gap:.28rem;margin-top:.15rem}
-@media(max-width:540px){.hl-card{flex-direction:column-reverse}.hl-photo-wrap{width:100%;min-height:180px;height:180px}}
+@media(max-width:540px){.hl-card{flex-direction:column-reverse}.hl-photo-col{width:100%;flex-direction:row}.hl-photo-wrap{width:50%;min-width:0;min-height:130px;height:130px}}
 /* MAP */
 .map-card{background:var(--white);border:1px solid var(--border);border-radius:8px;margin-bottom:1.1rem;overflow:hidden}
 .map-hdr{padding:.65rem .95rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.3rem;border-bottom:1px solid var(--border)}
@@ -454,10 +462,9 @@ a{color:inherit;text-decoration:none}.muted{color:var(--ink-ll);font-size:.72rem
   <div class="nav-logo">Travel<em>Planning</em> Pro</div>
   <div class="nav-r">
     <button class="btn btn-ghost btn-sm" style="color:#7dd87d;border-color:rgba(125,216,125,.4)" onclick="startNewTrip()" title="Clear all data and start a fresh trip">✦ New Trip</button>
-    <button class="btn btn-ghost btn-sm" onclick="navShare()">🔗 Share</button>
-    <button class="btn btn-ghost btn-sm" onclick="printReport()">Print</button>
-    <button class="btn btn-ghost btn-sm" onclick="downloadReport()">⬇ Save</button>
-    <button class="btn btn-ghost btn-sm" onclick="openLoadCodeModal()">📥 Load Trip</button>
+    <button class="btn btn-ghost btn-sm" onclick="printReport()" title="Print all tabs (itinerary, guide, budget) to PDF or paper">🖨 Print All</button>
+    <button class="btn btn-ghost btn-sm" onclick="downloadReport()" title="Download a standalone HTML file with the full trip report">💾 Save Report</button>
+    <button class="btn btn-ghost btn-sm" onclick="openLoadCodeModal()" title="Load a trip shared by code + password">📥 Load Trip</button>
     <button class="btn btn-ghost btn-sm" onclick="openSettings()">⚙ Settings</button>
   </div>
 </nav>
@@ -602,18 +609,6 @@ a{color:inherit;text-decoration:none}.muted{color:var(--ink-ll);font-size:.72rem
       </div>
     </div>
 
-    <div class="sb-section-label">📤 Share This App</div>
-    <div class="key-file-panel">
-      <div class="key-file-title">Send the app to a friend</div>
-      <div class="muted" style="margin-bottom:.4rem;font-size:.66rem">Downloads the HTML file — recipient just double-clicks to open. Keys are stored separately in their own browser.</div>
-      <div class="key-file-btns">
-        <button class="btn btn-ghost btn-sm" onclick="downloadApp()">⬇ Download App (HTML)</button>
-        <button class="btn btn-ghost btn-sm" onclick="copyAppLink()">🔗 Copy File Link</button>
-      </div>
-      <div style="margin-top:.55rem;padding:.5rem .65rem;background:rgba(125,216,125,.07);border:1px solid rgba(125,216,125,.2);border-radius:5px;font-size:.67rem;color:var(--ink-ll)">
-        ☁ <strong style="color:#7dd87d">Want to share without API keys?</strong> Deploy to Render.com as a static site — upload <code>index.html</code> and add your API keys as environment variables in the Render dashboard.
-      </div>
-    </div>
     <div class="sb-section-label">☁ Online Share</div>
     <div class="key-file-panel">
       <div class="key-file-title">Share via internet (password-protected)</div>
@@ -868,17 +863,26 @@ a{color:inherit;text-decoration:none}.muted{color:var(--ink-ll);font-size:.72rem
         <div class="prov-badge" id="prov-badge"></div>
       </div>
       <div class="out-acts">
-        <button class="btn btn-ghost btn-sm" onclick="goTab('plan')">← Edit</button>
-        <button class="btn btn-ghost btn-sm" onclick="goTab('map')">🗺 Map</button>
-        <button class="btn btn-ghost btn-sm" id="edit-itin-btn" onclick="toggleItinEdit()" style="color:var(--gold)">✏ Edit Itinerary</button>
-        <button class="pdf-btn" onclick="printTab('itin')">📥 PDF</button>
-        <button class="pdf-btn" onclick="exportWord('itin')">📄 Word</button>
-        <button class="btn btn-ghost btn-sm" onclick="downloadReport()" title="Download a standalone HTML report file to your computer">⬇ Download Report</button>
-        <button class="btn btn-ghost btn-sm" style="color:var(--gold)" onclick="saveCopyAs()" title="Save this trip to the in-app Saved Trips list (Settings)">💾 Save to App</button>
-        <button class="btn btn-teal btn-sm" onclick="shareTrip()">🔗 Share</button>
-        <button class="btn btn-teal btn-sm" onclick="openOnlineShareModal()" title="Encrypt &amp; upload to cloud — share by code + password">☁ Online</button>
-        <button class="btn btn-sm modify-toggle-btn" onclick="toggleModifyPanel()" id="modify-toggle-btn" title="Modify this itinerary with AI or adjust parameters">✏ Modify</button>
-        <button class="btn btn-sm" style="background:#E8F0FE;color:#1a56c4;border:1px solid rgba(26,86,196,.25)" onclick="exportAllToGCal()" title="Download all events as .ics — import into Google / Outlook / Apple Calendar in one go">📅 Export All to Calendar</button>
+        <!-- Edit dropdown -->
+        <div class="act-dropdown">
+          <button class="btn btn-ghost btn-sm act-drop-btn" onclick="toggleDropdown(this)">✏ Edit ▾</button>
+          <div class="act-drop-menu">
+            <button onclick="toggleModifyPanel();closeDropdowns()" id="modify-toggle-btn">⚡ Modify by AI</button>
+            <button onclick="toggleItinEdit();closeDropdowns()" id="edit-itin-btn">📝 Edit Item by Item</button>
+          </div>
+        </div>
+        <!-- Export dropdown -->
+        <div class="act-dropdown">
+          <button class="btn btn-ghost btn-sm act-drop-btn" onclick="toggleDropdown(this)">⬇ Export ▾</button>
+          <div class="act-drop-menu">
+            <button onclick="printTab('itin');closeDropdowns()">📥 PDF</button>
+            <button onclick="exportWord('itin');closeDropdowns()">📄 Word</button>
+          </div>
+        </div>
+        <!-- Share Online (code + password) -->
+        <button class="btn btn-teal btn-sm" onclick="openOnlineShareModal()" title="Encrypt &amp; upload — share by code + password">☁ Share</button>
+        <!-- Export All to Calendar -->
+        <button class="btn btn-sm" style="background:#E8F0FE;color:#1a56c4;border:1px solid rgba(26,86,196,.25)" onclick="exportAllToGCal()" title="Download all events as .ics — import into Google / Outlook / Apple Calendar">📅 Calendar</button>
       </div>
     </div>
 
@@ -927,25 +931,10 @@ a{color:inherit;text-decoration:none}.muted{color:var(--ink-ll);font-size:.72rem
       <button class="btn btn-ghost btn-sm" onclick="goTab('highlights')" style="color:var(--gold)">⭐ View Highlights →</button>
       <button class="btn btn-ghost btn-sm" onclick="goTab('hotels')">🏨 View Hotels →</button>
     </div>
-    <div class="share-panel" id="share-panel">
-      <div class="share-title">🔗 Share Your Trip Plan</div>
-      <div class="share-row"><input type="text" id="share-url" readonly><button class="btn btn-primary btn-sm" onclick="copyLink()">Copy</button></div>
-      <div class="share-socials">
-        <button class="share-btn" onclick="shareWA()">💬 WhatsApp</button>
-        <button class="share-btn" onclick="shareEmail()">✉ Email</button>
-        <button class="share-btn" onclick="shareTweet()">𝕏 Tweet</button>
-        <button class="share-btn" onclick="shareTelegram()">✈ Telegram</button>
-      </div>
-      <div class="save-notice">📁 Save to: <span class="save-path">C:\Users\Chong_Liong\OneDrive\Documents\Claude\Travel Pro\Reports\</span></div>
-      <hr class="load-code-sep">
-      <div class="load-code-lbl">📥 Load a trip someone shared with you</div>
-      <div class="share-row" style="margin-bottom:.35rem">
-        <input type="text" id="load-code-input" placeholder="Share code  e.g. 6841f2a…" style="font-family:monospace;letter-spacing:.04em">
-        <input type="password" id="load-code-pw" placeholder="Password" style="max-width:120px">
-        <button class="btn btn-primary btn-sm" onclick="loadByCode()">Load</button>
-      </div>
-      <div style="font-size:.64rem;color:rgba(240,200,122,.5);line-height:1.5">Ask the sender for both the code and password separately.</div>
-    </div>
+    <!-- share-url kept hidden for legacy JS compatibility -->
+    <input type="text" id="share-url" style="display:none" readonly>
+    <input type="text" id="load-code-input" style="display:none">
+    <input type="password" id="load-code-pw" style="display:none">
   </div>
 </div>
 </div>
@@ -1115,8 +1104,8 @@ a{color:inherit;text-decoration:none}.muted{color:var(--ink-ll);font-size:.72rem
 
 <script src="keys.js" onerror="void 0"></script>
 <script>
-// ── Embedded API keys (safe: Google Places key is domain-restricted to onrender.com) ──
-window.TRAVEL_PRO_KEYS = { google: 'AIzaSyCATnvOSLrPl4fOi63Ruzy0YwwxBpW5mns' };
+// ── Embedded API keys — set via keys.js (server-injected) or Settings → Google Places API ──
+window.TRAVEL_PRO_KEYS = window.TRAVEL_PRO_KEYS || { google: '' };
 // ══════════════════════════════════════════════════════════
 // DESTINATION DATA
 // ══════════════════════════════════════════════════════════
@@ -2301,7 +2290,8 @@ CHUNK INSTRUCTION: This trip is ${days} days. Generate ONLY days 1–${chunk1End
       if(actualChunk1End<days)
         toast(`⚠ Got ${actualChunk1End} of ${days} days — fetching remaining days ${actualChunk1End+1}–${days}…`,5000);
 
-      for(let from=actualChunk1End+1;from<=days;from+=CHUNK){
+      let from=actualChunk1End+1;
+      while(from<=days){
         const to=Math.min(from+CHUNK-1,days);
         toast(`⏳ Generating days ${from}–${to} of ${days}…`,8000);
         const contPrompt=`Continue a ${days}-day travel itinerary for "${name}".
@@ -2324,6 +2314,11 @@ CRITICAL: Return ONLY valid JSON — no markdown, no text outside JSON.
         if(moreDays.length){
           t.days=[...(t.days||[]),...moreDays];
           prevCity=moreDays[moreDays.length-1]?.city||prevCity;
+          // Advance from actual last day returned (not assumed chunk size)
+          const lastReturned=Math.max(...moreDays.map(d=>d.dayNumber||0));
+          from=lastReturned+1;
+        }else{
+          from+=CHUNK; // no days returned — advance to avoid infinite loop
         }
       }
     }
@@ -2371,7 +2366,7 @@ async function generateGuideAndBudget(t){
 
 TRIP: ${destStr} | ${m.days} days | From: ${m.homeCity||'KL'} (${m.flightClass||'Economy'}) | Travellers: ${m.travellers||'2 adults'} | Budget: ${m.budget||'Mid-range'} | Style: ${m.style||'Cultural'} | Transport: ${m.transport||'Taxi'} | Food: ${m.food||'Local cuisine'} | Diet: ${m.diet||'No restrictions'}
 
-IMPORTANT for currency in localGuide: show the local currency name and the conversion rate TO MYR (Malaysian Ringgit). Format: "1 [local currency] ≈ X.XX MYR". Include the digital/electronic arrival card or eTA URL if required for Malaysians entering ${destStr}.
+IMPORTANT for currency in localGuide: show the local currency name and the conversion rate TO MYR (Malaysian Ringgit). Format: "1 [local currency] ≈ X.XX MYR".${(()=>{const lr=window._liveRatesMYR;if(!lr)return'';const codes=Object.keys(lr).filter(c=>['CAD','USD','EUR','GBP','AUD','NZD','JPY','CNY','TWD','KRW','THB','SGD','HKD','AED','INR','IDR','PHP','VND'].includes(c));if(!codes.length)return'';return' Use these LIVE rates (fetched today): '+codes.map(c=>`1 ${c} = ${lr[c].toFixed(4)} MYR`).join(', ')+'.';})()} Include the digital/electronic arrival card or eTA URL if required for Malaysians entering ${destStr}.
 
 IMPORTANT for highLevelBudget: ALL amounts MUST be in MYR (Malaysian Ringgit). Set "currency":"MYR". Do NOT use local currency amounts. Use realistic MYR amounts for a Malaysian traveller.
 
@@ -2527,9 +2522,14 @@ function buildMustSee(t){
           +'<button class="pill p-gcal" onclick="addAttractionToGCal('+_orig+')" title="Add to Google Calendar">📅 Cal</button>'
         +'</div>'
       +'</div>'
-      +'<div class="hl-photo-wrap" id="mcpw-'+_orig+'" data-query="'+(a.name||'').replace(/"/g,'')+' '+(a.city||'').replace(/"/g,'')+'">'
-        +'<span>'+(a.emoji||'🏛')+'</span>'
-        +'<img class="hl-photo" id="mcph-'+_orig+'" alt="'+(a.name||'')+'" loading="lazy">'
+      +'<div class="hl-photo-col">'
+        +'<div class="hl-photo-wrap" id="mcpw-'+_orig+'" data-query="'+(a.name||'').replace(/"/g,'')+' '+(a.city||'').replace(/"/g,'')+'">'
+          +'<span>'+(a.emoji||'🏛')+'</span>'
+          +'<img class="hl-photo" id="mcph-'+_orig+'" alt="'+(a.name||'')+'" loading="lazy">'
+        +'</div>'
+        +'<div class="hl-photo-wrap" id="mcpw2-'+_orig+'" data-query="'+(a.name||'').replace(/"/g,'')+' interior '+(a.city||'').replace(/"/g,'')+'">'
+          +'<span style="font-size:1.2rem;opacity:.35">📷</span>'
+        +'</div>'
       +'</div>'
     +'</div>';
   }).join('');
@@ -2566,10 +2566,12 @@ async function loadAttractionPhotos(arr){
 
     // hl-card uses mcpw-{i} (wrap); legacy mc-card uses mcph-{i} (img)
     const wrap=$('mcpw-'+i);
+    const wrap2=$('mcpw2-'+i); // second photo slot
     const img=$('mcph-'+i);
     if(!wrap&&!img)continue;
 
     let found=false;
+    let googlePhotos=[]; // collect all Google Places photo names for 2nd photo
 
     // 1) Google Places API — best quality, needs key in Settings
     if(gKey&&!found){
@@ -2577,10 +2579,11 @@ async function loadAttractionPhotos(arr){
         const r=await fetch('https://places.googleapis.com/v1/places:searchText',{
           method:'POST',
           headers:{'Content-Type':'application/json','X-Goog-Api-Key':gKey,'X-Goog-FieldMask':'places.photos'},
-          body:JSON.stringify({textQuery:name+(city?' '+city:''),pageSize:1})
+          body:JSON.stringify({textQuery:name+(city?' '+city:''),pageSize:3})
         });
         const d=await r.json();
-        const pn=d.places?.[0]?.photos?.[0]?.name;
+        googlePhotos=d.places?.[0]?.photos||[];
+        const pn=googlePhotos[0]?.name;
         if(pn){
           const src='https://places.googleapis.com/v1/'+pn+'/media?maxWidthPx=600&key='+gKey;
           if(await tryLoad(src)){if(wrap)applyPhoto(wrap,src);else{img.onload=()=>{img.style.display='block';};img.src=src;}found=true;}
@@ -2639,6 +2642,42 @@ async function loadAttractionPhotos(arr){
       }catch(e){}
     }
     // If still not found, emoji placeholder stays visible
+
+    // ── Second photo slot (mcpw2-{i}) ──
+    if(wrap2){
+      let found2=false;
+      // Try Google Places photos[1] first
+      if(gKey&&googlePhotos[1]){
+        try{
+          const src='https://places.googleapis.com/v1/'+googlePhotos[1].name+'/media?maxWidthPx=600&key='+gKey;
+          if(await tryLoad(src)){applyPhoto(wrap2,src);found2=true;}
+        }catch(e){}
+      }
+      // Try Google Places photos[2] if photos[1] failed
+      if(gKey&&!found2&&googlePhotos[2]){
+        try{
+          const src='https://places.googleapis.com/v1/'+googlePhotos[2].name+'/media?maxWidthPx=600&key='+gKey;
+          if(await tryLoad(src)){applyPhoto(wrap2,src);found2=true;}
+        }catch(e){}
+      }
+      // Wikimedia Commons search with different query (add city suffix for variety)
+      if(!found2){
+        try{
+          const q2=name+' '+city+' travel';
+          const r=await fetch('https://commons.wikimedia.org/w/api.php?action=query&list=search&srsearch='+encodeURIComponent(q2)+'&srnamespace=6&srlimit=5&format=json&origin=*');
+          const d=await r.json();
+          const results=d.query?.search||[];
+          // Skip index 0 (likely same as photo 1), try index 1+
+          for(const result of results.slice(1)){
+            const r2=await fetch('https://commons.wikimedia.org/w/api.php?action=query&titles='+encodeURIComponent(result.title)+'&prop=imageinfo&iiprop=url&iiurlwidth=400&format=json&origin=*');
+            const d2=await r2.json();
+            const pg=Object.values(d2.query?.pages||{})[0];
+            const src=pg?.imageinfo?.[0]?.thumburl||pg?.imageinfo?.[0]?.url;
+            if(src&&await tryLoad(src)){applyPhoto(wrap2,src);found2=true;break;}
+          }
+        }catch(e){}
+      }
+    }
 
     await new Promise(r=>setTimeout(r,100));
   }
@@ -3935,7 +3974,7 @@ function toggleItinEdit(){
   if(itinEditMode) syncItinEdits(); // save before toggling off
   itinEditMode=!itinEditMode;
   const btn=$('edit-itin-btn');
-  if(btn){btn.textContent=itinEditMode?'✓ Done':'✏ Edit Itinerary';btn.style.fontWeight=itinEditMode?'700':'';}
+  if(btn){btn.textContent=itinEditMode?'✓ Done Editing':'📝 Edit Item by Item';btn.style.fontWeight=itinEditMode?'700':'';}
   const notice=$('edit-mode-notice');
   if(notice)notice.style.display=itinEditMode?'flex':'none';
   // Show/hide add-activity buttons
@@ -4506,12 +4545,12 @@ function renderBudget(b,meta){
   // Local destination currency (from trip data) — used for exchange rate display
   const _localCurFull=tripData?.currency||'';
   const _localCurCode=_localCurFull.replace(/\s*\(.*?\)/,'').trim();
-  // Static fallback rates (indicative, updated manually) — used before localGuide loads
-  const _STATIC_RATES={
-    'TWD':0.14,'JPY':0.030,'KRW':0.0033,'THB':0.13,'SGD':3.40,'HKD':0.59,
-    'MOP':0.57,'CNY':0.64,'VND':0.00018,'IDR':0.000029,'PHP':0.082,'INR':0.055,
-    'AUD':2.97,'NZD':2.70,'GBP':5.82,'EUR':5.00,'TRY':0.13,'AED':1.25,
-    'SAR':1.23,'USD':4.45,'CAD':3.25
+  // Exchange rates: live rates from startup fetch override static fallback (MYR per 1 unit)
+  const _STATIC_RATES=window._liveRatesMYR||{
+    'TWD':0.14,'JPY':0.030,'KRW':0.0032,'THB':0.13,'SGD':3.42,'HKD':0.59,
+    'MOP':0.57,'CNY':0.63,'VND':0.00018,'IDR':0.000029,'PHP':0.082,'INR':0.055,
+    'AUD':2.88,'NZD':2.65,'GBP':5.86,'EUR':4.97,'TRY':0.13,'AED':1.25,
+    'SAR':1.23,'USD':4.58,'CAD':2.88
   };
   // Use localGuide rate if available; fall back to static table
   let _fxDisplay=_fxRawStr;
@@ -4745,10 +4784,7 @@ async function _doLoadByCode(code,pw,errEl,btn,onSuccess){
 // ══ SHARE ══
 function navShare(){
   if(!tripData){toast('⚠ Generate a trip first, then share results');return;}
-  shareTrip();
-  // If not already on itin tab, switch so share panel is visible
-  const active=document.querySelector('.tab-panel.active');
-  if(active&&active.id!=='panel-itin')goTab('itin');
+  openOnlineShareModal();
 }
 
 function downloadApp(){
@@ -4795,17 +4831,8 @@ async function _urlDecompress(enc){
 }
 
 async function shareTrip(){
-  if(!tripData){toast('Generate first');return;}
-  try{
-    // Strip regeneratable fields — keeps URL 40–60% shorter
-    const{localGuide,highLevelBudget,packingList,_socketInfos,_saveKey,...slim}=tripData;
-    const enc=await _urlCompress(JSON.stringify(slim));
-    const url=location.origin+location.pathname+'?trip='+enc;
-    $('share-url').value=url;
-    $('share-panel').style.display='block';
-    $('share-panel').scrollIntoView({behavior:'smooth'});
-    if(navigator.share)navigator.share({title:tripData.tripName,text:tripData.summary,url}).catch(()=>{});
-  }catch(e){toast('Could not generate share link: '+e.message);}
+  // Redirects to Online Share modal (code + password method)
+  openOnlineShareModal();
 }
 function copyLink(){navigator.clipboard.writeText($('share-url').value).then(()=>toast('✓ Link copied!'));}
 function shareWA(){window.open('https://wa.me/?text='+esc('My travel plan: '+$('share-url').value));}
@@ -5076,7 +5103,7 @@ h1,h2,.out-title,.sec-title,.day-ttl,.guide-hdr-title,.budget-hdr-title,.mustsee
 .sumbar{display:grid;grid-template-columns:repeat(5,1fr);gap:.52rem;margin-bottom:1.2rem}
 .si{border:1px solid #E8DFD0;padding:.58rem .78rem;border-radius:5px}.si-lbl{font-size:.59rem;text-transform:uppercase;letter-spacing:.07em;color:#7A6F62;margin-bottom:.14rem}.si-val{font-size:.88rem;font-family:'Playfair Display',serif}
 .mustsee-panel{border:1px solid #E8DFD0;border-radius:8px;margin-bottom:1.1rem;overflow:hidden;display:block!important}.mustsee-hdr{background:#1A1208;padding:.62rem .95rem;display:flex;justify-content:space-between}.mustsee-hdr-title{font-family:'Playfair Display',serif;font-size:.88rem;color:#F0C87A}
-.ms-grid{display:flex;flex-direction:column}.hl-card{display:flex;page-break-inside:avoid}.hl-photo-wrap{width:160px;min-width:160px;height:160px}
+.ms-grid{display:flex;flex-direction:column}.hl-card{display:flex;page-break-inside:avoid}.hl-photo-col{display:flex;flex-direction:column;width:150px;gap:2px}.hl-photo-wrap{width:150px;min-width:150px;height:120px}
 .mc{border:1px solid #E8DFD0;border-radius:7px;overflow:hidden;background:#F5F0E8}.mc-top{padding:.68rem .75rem .4rem;display:flex;gap:.4rem}.mc-e{font-size:1.3rem;flex-shrink:0}.mc-name{font-weight:500;font-size:.77rem;line-height:1.3}.mc-city{font-size:.6rem;color:#7A6F62}.mc-rating{font-size:.59rem;color:#C4862B}
 .mc-desc{padding:0 .75rem .4rem;font-size:.68rem;color:#7A6F62;line-height:1.48}.mc-tip{margin:0 .75rem .4rem;font-size:.63rem;color:#0D4444;background:#E3F4F4;padding:.22rem .48rem;border-radius:4px}
 .mc-bottom{padding:.4rem .75rem .62rem;display:flex;gap:.2rem;flex-wrap:wrap;border-top:1px solid #E8DFD0;align-items:center}.mc-cost{font-size:.59rem;color:#C4862B;font-weight:500}
@@ -5208,6 +5235,43 @@ function exportWord(tabId){
   toast('Word document downloaded');
 }
 
+// ══ DROPDOWN HELPERS ══
+function toggleDropdown(btn){
+  const dd=btn.closest('.act-dropdown');
+  const wasOpen=dd.classList.contains('open');
+  closeDropdowns();
+  if(!wasOpen)dd.classList.add('open');
+}
+function closeDropdowns(){
+  document.querySelectorAll('.act-dropdown.open').forEach(d=>d.classList.remove('open'));
+}
+document.addEventListener('click',e=>{if(!e.target.closest('.act-dropdown'))closeDropdowns();});
+
+// ══ LIVE EXCHANGE RATES ══
+// Fetched on startup from open.er-api.com (free, no key). Stored in window._liveRatesMYR
+// so renderBudget() and the guide prompt can use accurate rates.
+window._liveRatesMYR=null;
+async function fetchLiveRates(){
+  try{
+    const cached=localStorage.getItem('tppFX');
+    if(cached){
+      const {ts,rates}=JSON.parse(cached);
+      // Cache is valid for 6 hours
+      if(Date.now()-ts<6*3600*1000&&rates){window._liveRatesMYR=rates;return;}
+    }
+    // open.er-api.com: base=MYR, rates give "1 MYR = X foreign", so invert for "1 foreign = Y MYR"
+    const r=await fetch('https://open.er-api.com/v6/latest/MYR',{cache:'no-store'});
+    if(!r.ok)return;
+    const d=await r.json();
+    if(d.rates){
+      const inverted={};
+      for(const [k,v] of Object.entries(d.rates)){if(v>0)inverted[k]=parseFloat((1/v).toFixed(6));}
+      window._liveRatesMYR=inverted;
+      localStorage.setItem('tppFX',JSON.stringify({ts:Date.now(),rates:inverted}));
+    }
+  }catch(e){/* silent — static fallback used */}
+}
+
 // ══ INIT ══
 window.addEventListener('DOMContentLoaded',()=>{
   const today=new Date(),inWeek=new Date(today.getTime()+7*86400000);
@@ -5272,6 +5336,8 @@ window.addEventListener('DOMContentLoaded',()=>{
     }
     toast('☁ Proxy mode active — no API keys needed. Just start planning!', 5000);
   }
+  // Fetch live exchange rates in background (updates window._liveRatesMYR for budget display)
+  fetchLiveRates().catch(()=>{});
 });
 
 // ══ DEMO DATA: Wonders of Canada (19 days) ══
@@ -6477,24 +6543,7 @@ function loadDemo(){
       </div>
     </div></div></div>
     </div>
-    <div class="share-panel" id="share-panel">
-      <div class="share-title">🔗 Share Your Trip Plan</div>
-      <div class="share-row"><input type="text" id="share-url" readonly=""><button class="btn btn-primary btn-sm" onclick="copyLink()">Copy</button></div>
-      <div class="share-socials">
-        <button class="share-btn" onclick="shareWA()">💬 WhatsApp</button>
-        <button class="share-btn" onclick="shareEmail()">✉ Email</button>
-        <button class="share-btn" onclick="shareTweet()">𝕏 Tweet</button>
-        <button class="share-btn" onclick="shareTelegram()">✈ Telegram</button>
-      </div>
-      <div class="save-notice">📁 Save to: <span class="save-path">C:\Users\Chong_Liong\OneDrive\Documents\Claude\Travel Pro\Reports\</span></div>
-      <hr class="load-code-sep">
-      <div class="load-code-lbl">📥 Load a trip someone shared with you</div>
-      <div class="share-row" style="margin-bottom:.35rem">
-        <input type="text" id="load-code-input" placeholder="Share code  e.g. 6841f2a…" style="font-family:monospace;letter-spacing:.04em">
-        <input type="password" id="load-code-pw" placeholder="Password" style="max-width:120px">
-        <button class="btn btn-primary btn-sm" onclick="loadByCode()">Load</button>
-      </div>
-      <div style="font-size:.64rem;color:rgba(240,200,122,.5);line-height:1.5">Ask the sender for both the code and password separately.`;
+    `;
 
   // ── Guide tab ──
   $('empty-guide').style.display='none';
