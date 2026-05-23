@@ -882,7 +882,7 @@ a{color:inherit;text-decoration:none}.muted{color:var(--ink-ll);font-size:.72rem
         <!-- Share Online (code + password) -->
         <button class="btn btn-teal btn-sm" onclick="openOnlineShareModal()" title="Encrypt &amp; upload — share by code + password">☁ Share</button>
         <!-- Export All to Calendar -->
-        <button class="btn btn-sm" style="background:#E8F0FE;color:#1a56c4;border:1px solid rgba(26,86,196,.25)" onclick="exportAllToGCal()" title="Download all events as .ics — import into Google / Outlook / Apple Calendar">📅 Calendar</button>
+        <button class="btn btn-sm" style="background:#E8F0FE;color:#1a56c4;border:1px solid rgba(26,86,196,.25)" onclick="exportAllToGCal()" title="Download .ics file — import into Google Calendar, Outlook or Apple Calendar">📅 Download .ics</button>
       </div>
     </div>
 
@@ -1146,6 +1146,23 @@ const DB = {
   beijing:    [{e:'🏯',n:'Great Wall — Mutianyu',d:'Best-restored section, toboggan descent, fewer crowds than Badaling'},{e:'🏛',n:'Forbidden City (Palace Museum)',d:'9,999-room imperial palace — book online, arrive before 9am'},{e:'🌿',n:'Summer Palace',d:'Marble Boat, Long Corridor and Kunming Lake — 1.5 hrs from city'},{e:'🛕',n:'Temple of Heaven',d:'Circular Hall of Prayer for Good Harvests — dawn tai chi in the park'},{e:'🍽',n:'Wangfujing Night Market',d:'Beijing street food: scorpion skewers, roast duck wraps, jianbing'},{e:'🎭',n:'798 Art District',d:'Former Bauhaus factory turned contemporary art hub — free to browse'}],
   'hong kong':[{e:'🌆',n:'Victoria Peak (The Peak)',d:'Iconic 360° harbour view — take the Peak Tram for the experience'},{e:'⛴',n:'Star Ferry Crossing',d:'The world\'s best HK$2.70 view — Kowloon to HK Island at dusk'},{e:'🏮',n:'Temple Street Night Market',d:'Fortune tellers, Cantonese opera, dai pai dong street food'},{e:'🌿',n:'Lantau Island & Big Buddha',d:'Giant bronze Buddha plus Ngong Ping cable car and monastery'},{e:'🍱',n:'Tim Ho Wan Dim Sum',d:'World\'s cheapest Michelin star — queue before 11am'},{e:'🌃',n:'Tsim Sha Tsui Promenade',d:'Avenue of Stars facing the harbour — Symphony of Lights at 8pm'}],
   taiwan:     [{e:'🏮',n:'Jiufen Old Street',d:'Spirited Away\'s inspiration — red lanterns and tea houses on the hillside'},{e:'🌋',n:'Taroko Gorge',d:'Marble canyon — Taiwan\'s greatest natural spectacle, east-coast day trip'},{e:'🛕',n:'Longshan Temple',d:'Taipei\'s oldest temple — incense clouds and fortune-telling sticks'},{e:'🌃',n:'Shilin Night Market',d:'Taiwan\'s most famous night market — oyster vermicelli and stinky tofu'},{e:'🏙',n:'Taipei 101 Observatory',d:'Top-5 world tower — high-speed elevator, views to Yangmingshan'},{e:'🌿',n:'Sun Moon Lake',d:'Sacred aboriginal lake in the mountains — cycle the 33km perimeter'}],
+  xian:       [{e:'🏺',n:'Terracotta Army (Qin Shi Huang Mausoleum)',d:'8,000 life-size warriors — one of archaeology\'s greatest discoveries; arrive early'},{e:'🏯',n:'Ancient City Wall',d:'World\'s best-preserved medieval city wall — cycle the full 14km circuit at sunset'},{e:'🕌',n:'Muslim Quarter (Huimin Jie)',d:'400-year-old Islamic quarter — Yang Rou Pao Mo soup, pomegranate juice, Roujiamo'},{e:'🛕',n:'Big Wild Goose Pagoda',d:'7th-century Tang dynasty pagoda — fountain light show every evening'},{e:'🏛',n:'Shaanxi History Museum',d:'China\'s premier provincial museum — Tang gold, Zhou bronzes; free tickets online'},{e:'♨',n:'Huaqing Hot Springs & Palace',d:'Imperial hot spring resort where the Xi\'an Incident took place — scenic Li Mountain'}],
+  zhengzhou:  [{e:'🥋',n:'Shaolin Temple (Dengfeng)',d:'Birthplace of Kung Fu — monks perform martial arts daily; 1.5hrs from Zhengzhou'},{e:'🗿',n:'Longmen Grottoes (Luoyang)',d:'UNESCO — 100,000 Buddhist carvings in cliff face along the Yi River; 1.5hrs away'},{e:'🌊',n:'Yellow River Scenic Area',d:'Mother River of China — sand dunes, folklore museum and yellow-water gorge views'},{e:'⛰',n:'Yuntai Mountain Geopark',d:'UNESCO Global Geopark — red rock gorges and China\'s highest waterfall'},{e:'🏛',n:'Henan Museum',d:'One of China\'s oldest museums — Oracle Bone scripts, Shang dynasty bronzes'},{e:'🌸',n:'Guanlin Temple',d:'Dedicated to Guan Yu, god of war — 800-year-old ginkgo trees in the courtyard'}],
+  luoyang:    [{e:'🗿',n:'Longmen Grottoes',d:'UNESCO World Heritage — 2,300 caves of Buddhist art carved into limestone cliffs'},{e:'🛕',n:'White Horse Temple',d:'China\'s first Buddhist temple (68 AD) — tranquil gardens, Indian-style stupa'},{e:'🌸',n:'Luoyang Peony Garden',d:'Luoyang is China\'s Peony Capital — spectacular blooms April–May'},{e:'🏯',n:'Luoyang Old Town',d:'Tang dynasty heritage area with restored Sui-Tang palaces and museums'},{e:'🌿',n:'Baiyun Mountain',d:'Misty Taoist mountain retreat 90km north — waterfalls and cliff-edge temples'},{e:'🏛',n:'Luoyang Museum',d:'Rich collection of 3,000-year imperial history — Han dynasty relics and Ming porcelain'}],
+  wuhan:      [{e:'🗼',n:'Yellow Crane Tower',d:'China\'s most celebrated tower — Tang dynasty poems and sweeping Yangtze views'},{e:'🌿',n:'East Lake Scenic Area',d:'China\'s largest urban lake — cherry blossoms in March, 102km cycling trail'},{e:'🏛',n:'Hubei Provincial Museum',d:'Marquis Yi\'s 2,400-year-old bronze chime bells — free entry, reserve online'},{e:'🌉',n:'Wuhan Yangtze River Bridge',d:'China\'s first Yangtze highway-railway bridge — walk the pedestrian footway'},{e:'🍜',n:'Hubei Intangible Cultural Heritage Park',d:'Hot dry noodles, re gan mian — try at Ji Qing Street morning market'},{e:'⛴',n:'Yangtze River Night Cruise',d:'Evening cruise past the illuminated bridge and Yellow Crane Tower'}],
+  nanjing:    [{e:'🏯',n:'Ming Xiaoling Mausoleum',d:'UNESCO — Ming founder Zhu Yuanzhang\'s tomb lined with stone animal statues'},{e:'🌿',n:'Sun Yat-sen Mausoleum',d:'Republican-era memorial atop Purple Mountain — 392 steps and panoramic city views'},{e:'🏛',n:'Nanjing Massacre Memorial Hall',d:'Solemn and important — documents the 1937 tragedy; required visiting'},{e:'🌉',n:'Confucius Temple (Fuzi Miao)',d:'Ancient exam halls turned riverside marketplace and night-food street'},{e:'🏙',n:'Nanjing City Wall',d:'World\'s longest preserved medieval city wall — 35km, hire a bike section'},{e:'⛵',n:'Xuanwu Lake Park',d:'Lake with five islands in city centre — paddle boats and Ming-era watchtowers'}],
+  kunming:    [{e:'🗿',n:'Stone Forest (Shilin)',d:'UNESCO — 270-million-year-old limestone pinnacles rising from the earth; 90km from city'},{e:'🌊',n:'Dian Lake (Erhai, Dali)',d:'Largest plateau lake in Yunnan — sunset over the Western Hills and Dragon Gate'},{e:'🏛',n:'Yunnan Provincial Museum',d:'Bronze-age Dian Kingdom culture, colourful Yi and Bai ethnic artefacts'},{e:'🌺',n:'Green Lake Park',d:'Migratory black-headed gulls flock here Nov–Mar — locals feed them from the bridge'},{e:'🎨',n:'Kunming Old Town (Guandu)',d:'900-year-old market town with temple and pagoda — best for local snacks'},{e:'🍄',n:'Yunnan Wild Mushroom Market',d:'Most biodiverse fungi market in the world — seasonal Jul–Oct'}],
+  harbin:     [{e:'❄',n:'Harbin Ice & Snow World',d:'Largest ice festival on Earth — neon-lit palaces carved from Songhua River ice (Dec–Feb)'},{e:'🏛',n:'Saint Sophia Cathedral',d:'1907 Russian Orthodox cathedral — Byzantine architecture in the heart of China'},{e:'🌿',n:'Siberian Tiger Park',d:'World\'s largest Amur tiger reserve — safari bus through enclosures'},{e:'🛍',n:'Central Avenue (Zhongyang Dajie)',d:'Russian-era pedestrian boulevard — Harbin sausage, kvass beer and maladets ice cream'},{e:'⛸',n:'Songhua River Ice Activities',d:'Ice skating, ice golf and horse-drawn sleigh rides on the frozen river (Dec–Feb)'},{e:'🐻',n:'Harbin Polarland',d:'Polar bear and beluga whale shows — unique attraction in northeast China'}],
+  qingdao:    [{e:'🍺',n:'Tsingtao Brewery Museum',d:'1903 German brewery — guided tour, unlimited fresh beer tasting at the end'},{e:'🌊',n:'No.1 Bathing Beach',d:'Qingdao\'s most famous golden beach — ocean views framed by red tile rooftops'},{e:'🏛',n:'Old German Colonial District',d:'Walk the Bavarian streets around the Catholic Church and Governor\'s Mansion'},{e:'🛕',n:'Zhanshan Temple',d:'Active Buddhist temple on a forested hillside — sweeping sea views from the pagoda'},{e:'⛵',n:'Qingdao Olympic Sailing Centre',d:'2008 Olympics venue — waterfront promenade, seafood restaurants and harbour views'},{e:'🌿',n:'Laoshan Scenic Area',d:'Taoist holy mountain meeting the sea — mineral springs and tea plantations'}],
+  xiamen:     [{e:'🏝',n:'Gulangyu Island',d:'UNESCO — piano island with colonial villas, car-free streets and small beaches; 10min ferry'},{e:'🏯',n:'Sunlight Rock (Gulangyu)',d:'Highest point on the island — panoramic view of the coast and Zhangzhou mountains'},{e:'🛕',n:'Nanputuo Temple',d:'Thousand-year-old Buddhist temple on Wulaofeng mountain — free entry at dawn'},{e:'🌿',n:'Xiamen University Campus',d:'China\'s most beautiful campus — colonial architecture, banyan trees and coastal setting'},{e:'🏖',n:'Zengcuo\'an Village',d:'Bohemian art village between university and sea — cafés and street murals'},{e:'🎎',n:'Tulou Earth Buildings (Nanjing/Yongding)',d:'UNESCO Hakka earthen castles in the mountains — half-day trip from Xiamen'}],
+  dalian:     [{e:'🌊',n:'Bangchuidao Scenic Area',d:'Rocky coastline and forest — Bangchui Island connected by bridge, best at sunrise'},{e:'🐟',n:'Dalian Seafood Market',d:'Freshest sea urchin, geoduck and abalone direct from boats at Xinghai Square market'},{e:'🎡',n:'Xinghai Square',d:'World\'s largest public square — 1.1km wide, with a golden boulevard of 999 steps'},{e:'🌿',n:'Tiger Beach Ocean Park',d:'Marine park with dolphin shows and a unique seaside tiger zone'},{e:'🚋',n:'Dalian Tram (Route 201)',d:'Century-old tram line along the coast — most scenic urban tram in China'},{e:'🏛',n:'Russian Architecture District',d:'Russian-era buildings near Zhongshan Square — 10 avenues radiating from a roundabout'}],
+  sanya:      [{e:'🏖',n:'Yalong Bay National Resort',d:'China\'s "Hawaii" — 7km of powdery white sand with clear water; best beach in Sanya'},{e:'🌊',n:'Tianya Haijiao (End of Earth)',d:'Legendary coastal rock formation — sunset over the South China Sea'},{e:'🛕',n:'Nanshan Cultural Tourism Zone',d:'108m Guanyin Buddha statue rising from the sea — one of Asia\'s largest'},{e:'🤿',n:'Wuzhizhou Island Diving',d:'Coral reef diving and snorkelling — boat trip from Haitang Bay pier'},{e:'🌴',n:'Dadonghai Beach',d:'Most accessible beach — beachside bars, water sports and local seafood'},{e:'🌺',n:'Yanoda Rainforest',d:'Tropical rainforest adventure park — ziplines, ropewalks and jungle pools'}],
+  zhangjiajie:[{e:'🌄',n:'Zhangjiajie National Forest Park',d:'Avatar Hallelujah Mountains — 3,000 sandstone pillars, inspiration for Pandora'},{e:'🚡',n:'Tianmen Mountain Cable Car',d:'World\'s longest cable car (7.5km) — glass-floor walkway on a 1,500m cliff face'},{e:'🌉',n:'Glass Bridge',d:'World\'s highest and longest glass-bottom bridge (430m) — suspended over Grand Canyon'},{e:'🔭',n:'Yuanjiajie Scenic Area',d:'Avatar Hallelujah Mountain viewpoint — Hallelujah Mountain floating in the clouds'},{e:'🏞',n:'Golden Whip Stream Trail',d:'7.5km valley walk through towering pillars — crystal-clear stream and monkeys'},{e:'⛰',n:'Tianzi Mountain',d:'"Pillar of South China Sky" — misty peaks above the cloud line at dawn'}],
+  lijiang:    [{e:'🏯',n:'Lijiang Old Town',d:'UNESCO Naxi ancient town — cobblestone lanes, water wheels and snow mountain backdrop'},{e:'🏔',n:'Jade Dragon Snow Mountain',d:'Glacial peak at 5,596m — cable car to 4,506m, close enough to touch the ice'},{e:'🌊',n:'Lugu Lake',d:'Sacred matriarchal Mosuo tribe lake — motorboat across to Liwubi Island'},{e:'🎭',n:'Impression Lijiang Show',d:'Zhang Yimou\'s outdoor spectacle — 500 performers on a glacier stage at 3,100m'},{e:'🌿',n:'Tiger Leaping Gorge Trek',d:'One of the world\'s deepest gorges — 2-day hike with Jade Dragon Snow Mountain views'},{e:'🛕',n:'Shuhe Ancient Town',d:'Quieter, smaller Naxi village 4km from Lijiang — fewer tourists, same charm'}],
+  dali:       [{e:'🏯',n:'Three Pagodas of Chongsheng Temple',d:'9th-century trio of white pagodas reflected in a lake — iconic Yunnan image'},{e:'🌊',n:'Erhai Lake Cycling',d:'Cycle the 117km shoreline — Bai fishing villages, causeways and Cangshan reflections'},{e:'🏙',n:'Dali Old Town (Ancient Town)',d:'Ming-era walled city — marble stalls, tie-dye shops and street cafés'},{e:'🏔',n:'Cangshan Mountain',d:'Snow-capped range behind Dali — cable car, hiking trails and Qingbi Stream waterfalls'},{e:'🎨',n:'Xizhou Bai Village',d:'Best-preserved Bai ethnic village 18km north — courtyard mansions and milky goat cheese'},{e:'🛕',n:'Chongsheng Temple Complex',d:'Vast temple and museum complex behind the Three Pagodas — free with tower ticket'}],
+  pingyao:    [{e:'🏯',n:'Pingyao Ancient City Wall',d:'UNESCO — most complete Ming city wall in China; 6.4km, walk the full circuit at sunset'},{e:'🏛',n:'Rishengchang Exchange Shop',d:'World\'s first bank (1823) — birthplace of Chinese banking system'},{e:'🎎',n:'Ming & Qing Street (Nan Dajie)',d:'Perfectly preserved Qing dynasty commercial street — lacquerware and vinegar shops'},{e:'🕍',n:'Confucius Temple',d:'2,000-year-old complex in city centre — ancient stele and scholar pavilions'},{e:'🏠',n:'Traditional Courtyard Hotels',d:'Stay in a 300-year-old merchant mansion — most guesthouses are heritage buildings'},{e:'⛪',n:'Shuanglin Temple',d:'UNESCO — 2,000 painted Buddhist sculptures in 10 halls; 5km outside the walls'}],
+  lhasa:      [{e:'🛕',n:'Potala Palace',d:'UNESCO — 13-storey winter palace of the Dalai Lama; book permits 2 days ahead'},{e:'🕍',n:'Jokhang Temple',d:'Tibet\'s holiest temple — pilgrims prostrate in Barkhor Square from dawn'},{e:'🌿',n:'Barkhor Street Circuit',d:'Ritual kora walk around Jokhang — market stalls, prayer flags and butter lamps'},{e:'⛰',n:'Namtso Lake',d:'World\'s highest saltwater lake at 4,718m — 4hrs from Lhasa, celestial blue water'},{e:'🏔',n:'Ganden Monastery',d:'Perched at 4,300m — yellow hat Buddhist monastery with panoramic Kyichu Valley views'},{e:'🌄',n:'Sera Monastery Debate',d:'Monks debate Buddhist philosophy in the courtyard daily at 3pm — free to watch'}],
+  changsha:   [{e:'🏛',n:'Hunan Museum (Mawangdui)',d:'2,100-year-old Han dynasty mummy and silk funeral suit — astonishing preservation'},{e:'🌿',n:'Yuelu Mountain & Academy',d:'1,000-year-old Confucian academy on a forested mountain — free entry'},{e:'🗺',n:'Tianmen Mountain (Zhangjiajie)',d:'4hrs north — Avatar mountains and world\'s highest cable car'},{e:'🍜',n:'Taiping Street Night Snacks',d:'Changsha stinky tofu, sugar-fried chestnuts and Mao\'s braised pork — local institution'},{e:'🎭',n:'Orange Isle (Juzizhou)',d:'River island with giant Mao statue — panoramic views of Changsha skyline'},{e:'🌊',n:'Xiang River Promenade',d:'Sunset riverside walk and boat cruises — new waterfront district with rooftop bars'}],
 };
 
 // Seasonal data per destination
@@ -1277,8 +1294,19 @@ const ALIAS={
   'beijing':'beijing','北京':'beijing','peking':'beijing',
   'hong kong':'hong kong','hongkong':'hong kong','hk':'hong kong','香港':'hong kong',
   'taiwan':'taiwan','taipei':'taiwan','台北':'taiwan','台湾':'taiwan',
-  'guangzhou':'china','shenzhen':'china','chengdu':'china','xian':'china','xi\'an':'china',
-  'guilin':'china','chongqing':'china','nanjing':'china','wuhan':'china','kunming':'china',
+  'guangzhou':'china','shenzhen':'china','chengdu':'china','xian':'xian','xi\'an':'xian','西安':'xian',
+  'guilin':'guilin','桂林':'guilin','chongqing':'chongqing','重庆':'chongqing',
+  'nanjing':'nanjing','南京':'nanjing','wuhan':'wuhan','武汉':'wuhan','kunming':'kunming','昆明':'kunming',
+  'zhengzhou':'zhengzhou','郑州':'zhengzhou','henan':'zhengzhou','河南':'zhengzhou',
+  'luoyang':'luoyang','洛阳':'luoyang',
+  'harbin':'harbin','哈尔滨':'harbin','qingdao':'qingdao','青岛':'qingdao',
+  'xiamen':'xiamen','厦门':'xiamen','dalian':'dalian','大连':'dalian',
+  'sanya':'sanya','三亚':'sanya','zhangjiajie':'zhangjiajie','张家界':'zhangjiajie',
+  'lijiang':'lijiang','丽江':'lijiang','dali':'dali','大理':'dali',
+  'pingyao':'pingyao','平遥':'pingyao','lhasa':'lhasa','拉萨':'lhasa','tibet':'lhasa',
+  'changsha':'changsha','长沙':'changsha','fuzhou':'fuzhou','福州':'fuzhou',
+  'jinan':'jinan','济南':'jinan','ningbo':'ningbo','宁波':'ningbo',
+  'shenyang':'shenyang','沈阳':'shenyang','taiyuan':'taiyuan','太原':'taiyuan',
   'macau':'hong kong','macao':'hong kong',
 };
 
@@ -1292,7 +1320,7 @@ const COUNTRY_CITIES={
   singapore:   ['Singapore'],
   vietnam:     ['Hanoi','Ho Chi Minh City','Da Nang','Hoi An'],
   korea:       ['Seoul','Busan','Jeju Island','Gyeongju','Incheon'],
-  china:       ['Shanghai','Beijing','Hangzhou','Suzhou','Chengdu','Guilin','Guangzhou','Shenzhen'],
+  china:       ['Shanghai','Beijing','Xi\'an','Hangzhou','Suzhou','Chengdu','Guilin','Guangzhou','Shenzhen','Chongqing','Nanjing','Wuhan','Kunming','Zhengzhou','Luoyang','Harbin','Qingdao','Xiamen','Dalian','Sanya','Zhangjiajie','Lijiang','Dali','Pingyao'],
   'hong kong': ['Hong Kong'],
   taiwan:      ['Taipei','Taichung','Tainan','Hualien','Taroko'],
   canada:      ['Vancouver','Whistler','Banff','Calgary','Toronto','Montreal'],
@@ -1336,7 +1364,7 @@ const COUNTRY_DETECT=[
   [/singapore/i,'singapore'],
   [/vietnam|vietnamese|hanoi|saigon|danang|hoian/i,'vietnam'],
   [/korea|korean|seoul|busan|jeju/i,'korea'],
-  [/china|chinese|shanghai|beijing|hangzhou|suzhou|chengdu/i,'china'],
+  [/china|chinese|shanghai|beijing|hangzhou|suzhou|chengdu|xi.?an|xian|guilin|chongqing|nanjing|wuhan|kunming|zhengzhou|luoyang|harbin|qingdao|xiamen|dalian|sanya|zhangjiajie|lijiang|\bdali\b|pingyao|lhasa|changsha|fuzhou|jinan|ningbo|shenyang|taiyuan|hefei|urumqi|changchun|wenzhou/i,'china'],
   [/hong\s*kong|\bhk\b/i,'hong kong'],
   [/taiwan|taipei/i,'taiwan'],
   [/canada|canadian|vancouver|whistler|banff|calgary|toronto|montreal/i,'canada'],
@@ -1759,32 +1787,78 @@ function renderChips(idx,val){
   const wrap=$('suggest-wrap');
   const existing=$('sb-'+idx);
   const key=findDB(val);
-  if(!key||!DB[key]?.length){if(existing)existing.remove();return;}
 
-  let block=existing;
-  if(!block){
-    block=document.createElement('div');
-    block.className='suggest-block';block.id='sb-'+idx;
-    wrap.appendChild(block);
+  if(key&&DB[key]?.length){
+    // ── DB match: show curated attraction chips ──
+    let block=existing;
+    if(!block){
+      block=document.createElement('div');
+      block.className='suggest-block';block.id='sb-'+idx;
+      wrap.appendChild(block);
+    }
+    if(!destSelected[idx])destSelected[idx]=new Set();
+    const sel=destSelected[idx];
+    const destName=val.split(',')[0].trim();
+    block.innerHTML=`
+      <div class="sb-hdr">
+        <div class="sb-label-text">✨ Must-sees for <span class="sb-dest">${destName}</span></div>
+        <button class="sb-clear" onclick="clearBlock(${idx})">clear all</button>
+      </div>
+      <div class="chips" id="chips-${idx}">
+        ${DB[key].map((a,i)=>`<div class="chip${sel.has(a.n)?' on':''}" onclick="toggleChip(${idx},${i},'${a.n.replace(/'/g,"\\'")}','${key}')">
+          <span class="chip-e">${a.e}</span>
+          <span>${a.n}</span>
+          <span class="chip-d">— ${a.d}</span>
+        </div>`).join('')}
+      </div>
+      <div class="chips-hint">Click to select · chosen attractions appear in your notes</div>`;
+    window['_dbkey_'+idx]=key;
+    return;
   }
-  if(!destSelected[idx])destSelected[idx]=new Set();
-  const sel=destSelected[idx];
-  const destName=val.split(',')[0].trim();
 
-  block.innerHTML=`
-    <div class="sb-hdr">
-      <div class="sb-label-text">✨ Must-sees for <span class="sb-dest">${destName}</span></div>
-      <button class="sb-clear" onclick="clearBlock(${idx})">clear all</button>
-    </div>
-    <div class="chips" id="chips-${idx}">
-      ${DB[key].map((a,i)=>`<div class="chip${sel.has(a.n)?' on':''}" onclick="toggleChip(${idx},${i},'${a.n.replace(/'/g,"\\'")}','${key}')">
-        <span class="chip-e">${a.e}</span>
-        <span>${a.n}</span>
-        <span class="chip-d">— ${a.d}</span>
-      </div>`).join('')}
-    </div>
-    <div class="chips-hint">Click to select · chosen attractions appear in your notes</div>`;
-  window['_dbkey_'+idx]=key;
+  // ── No DB match: clear any existing block, then try Wikipedia fallback ──
+  if(existing)existing.remove();
+  const cityName=val.split(',')[0].trim();
+  if(cityName.length<3)return;
+  clearTimeout(window['_wikiTimer_'+idx]);
+  window['_wikiTimer_'+idx]=setTimeout(()=>_fetchWikiChips(idx,cityName),650);
+}
+
+async function _fetchWikiChips(idx,cityName){
+  const cacheKey='_wikiChip_'+cityName.toLowerCase();
+  if(window[cacheKey]===false)return;               // confirmed not a place
+  const wrap=$('suggest-wrap');
+  if(!wrap)return;
+  // Remove stale block if user re-typed quickly
+  const stale=$('sb-'+idx);if(stale)stale.remove();
+  try{
+    const ctrl=new AbortController();
+    setTimeout(()=>ctrl.abort(),5000);
+    const r=await fetch(
+      `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(cityName)}`,
+      {signal:ctrl.signal}
+    );
+    if(!r.ok){window[cacheKey]=false;return;}
+    const d=await r.json();
+    // Accept only settlement/place pages
+    const placeRe=/city|town|municipalit|village|prefecture|province|region|district|capital|settlement|county|borough|commune|island/i;
+    const looksLikePlace=placeRe.test(d.description||'')||placeRe.test((d.extract||'').slice(0,120));
+    if(!d.extract||!looksLikePlace){window[cacheKey]=false;return;}
+    window[cacheKey]=d;
+    // Guard: user may have moved on
+    if($('sb-'+idx))return;
+    const block=document.createElement('div');
+    block.className='suggest-block';block.id='sb-'+idx;
+    const snippet=(d.extract||'').slice(0,220).replace(/</g,'&lt;');
+    const trail=d.extract&&d.extract.length>220?'…':'';
+    block.innerHTML=`
+      <div class="sb-hdr">
+        <div class="sb-label-text">🌐 <span class="sb-dest">${cityName}</span> — found online</div>
+      </div>
+      <div style="font-size:.78rem;color:var(--ink-l);padding:.25rem .1rem .45rem;line-height:1.55">${snippet}${trail}</div>
+      <div class="chips-hint" style="color:var(--teal);font-style:normal">✓ AI will suggest top attractions for <strong>${cityName}</strong> when you generate your itinerary</div>`;
+    wrap.appendChild(block);
+  }catch(e){}
 }
 
 function toggleChip(idx,i,name,key){
@@ -2000,17 +2074,31 @@ async function callWithFallback(prompt,validate=null){
     if(!key&&!NETLIFY_MODE){fbEntry(p,'skip');errors[p]='no key';continue;}
     fbEntry(p,'trying');
     $('load-txt').textContent='Trying '+P_LABELS[p]+(NETLIFY_MODE?' (via proxy)':'')+'…';
-    try{
-      const text=await CALL[p](prompt,key,model);
-      if(validate)validate(text);
-      fbEntry(p,'ok');
-      const dot=$('adot-'+p);if(dot)dot.className='api-dot ok';
-      return{text,provider:p,model};
-    }catch(err){
-      fbEntry(p,'err',err.message);
-      errors[p]=err.message.slice(0,60);
-      const dot=$('adot-'+p);if(dot)dot.className='api-dot err';
-      toast('⚠ '+P_LABELS[p]+' failed → trying next…',2500);
+    // Retry up to 2× within same provider for JSON validation failures (Gemini occasionally
+    // prepends preamble text before the JSON on the first attempt)
+    for(let attempt=0;attempt<2;attempt++){
+      try{
+        const text=await CALL[p](prompt,key,model);
+        if(validate)validate(text);
+        fbEntry(p,'ok');
+        const dot=$('adot-'+p);if(dot)dot.className='api-dot ok';
+        return{text,provider:p,model};
+      }catch(err){
+        const isJsonErr=err.message.includes('No JSON')||err.message.includes('no usable');
+        if(attempt===0&&isJsonErr){
+          // Transient JSON response — retry once silently before giving up on this provider
+          fbEntry(p,'trying');
+          $('load-txt').textContent='Retrying '+P_LABELS[p]+'…';
+          await new Promise(r=>setTimeout(r,800));
+          continue;
+        }
+        fbEntry(p,'err',err.message);
+        errors[p]=err.message.slice(0,60);
+        const dot=$('adot-'+p);if(dot)dot.className='api-dot err';
+        if(PROVIDERS.filter(q=>localStorage.getItem('tppK_'+q)||NETLIFY_MODE).length>1)
+          toast('⚠ '+P_LABELS[p]+' failed → trying next…',2500);
+        break;
+      }
     }
   }
   const detail=PROVIDERS.filter(p=>errors[p]&&errors[p]!=='no key').map(p=>`${P_LABELS[p]}: ${errors[p]}`).join(' | ');
@@ -2147,7 +2235,7 @@ async function generateAll(){
   const nightsStr=nightsPerCity.some(n=>n!=null)
     ?'Nights per city: '+dests.map((d,i)=>nightsPerCity[i]!=null?`${d.split(',')[0].trim()}=${nightsPerCity[i]}n`:`${d.split(',')[0].trim()}=auto`).join(', ')+'. Respect these splits exactly; only auto-allocate cities marked auto.'
     :'';
-  const CHINESE_REGIONS=/china|taiwan|hong kong|shanghai|beijing|suzhou|hangzhou|guangzhou|shenzhen|chengdu|nanjing|wuhan|xi'an|xian|guilin|chongqing|kunming|taipei|macau|macao/i;
+  const CHINESE_REGIONS=/china|taiwan|hong kong|shanghai|beijing|suzhou|hangzhou|guangzhou|shenzhen|chengdu|nanjing|wuhan|xi.?an|xian|guilin|chongqing|kunming|zhengzhou|luoyang|harbin|qingdao|xiamen|dalian|sanya|zhangjiajie|lijiang|dali|pingyao|lhasa|tibet|hefei|fuzhou|changsha|taiyuan|jinan|ningbo|wuxi|shenyang|henan|hunan|hubei|liaoning|shaanxi|shandong|taipei|macau|macao/i;
   const isChinese=dests.some(d=>CHINESE_REGIONS.test(d));
 
   $('loading').style.display='block';
@@ -3739,7 +3827,7 @@ function cleanPlaceName(name){
 }
 
 // Mainland China cities → append ", China"
-const CHINA_RE=/\b(china|shanghai|beijing|suzhou|hangzhou|guangzhou|shenzhen|chengdu|nanjing|wuhan|xi.?an|guilin|chongqing|kunming|zhejiang|jiangsu|sichuan|yunnan|guangdong)\b/i;
+const CHINA_RE=/\b(china|shanghai|beijing|suzhou|hangzhou|guangzhou|shenzhen|chengdu|nanjing|wuhan|xi.?an|xian|guilin|chongqing|kunming|zhengzhou|luoyang|harbin|qingdao|xiamen|dalian|sanya|zhangjiajie|lijiang|dali|pingyao|lhasa|tibet|urumqi|xinjiang|hefei|fuzhou|wenzhou|changsha|taiyuan|shijiazhuang|jinan|ningbo|wuxi|changchun|shenyang|zhejiang|jiangsu|sichuan|yunnan|guangdong|henan|hunan|anhui|hubei|liaoning|jilin|heilongjiang|shaanxi|shanxi|gansu|qinghai|shandong)\b/i;
 // Separate regions with own Google Maps identity
 const TAIWAN_RE=/\b(taiwan|taipei|kaohsiung|taichung|tainan|hualien|keelung|taoyuan)\b/i;
 const HK_RE=/\b(hong kong|hongkong)\b/i;
@@ -3811,11 +3899,20 @@ function buildCityMaps(t){
       const places=d.places.slice(0,4);
       const hotelQ=`${h.name}, ${city}${country}`;
 
+      // ── Next hotel (for progressive routing: current city → next city's hotel) ──
+      const nextHotel=(t.hotels||[])[d.hotelIdx+1]||null;
+      const nextHotelQ=nextHotel?`${nextHotel.name}, ${nextHotel.city}`:'';
+      // Route endpoint: next hotel if moving on, else loop back to same hotel
+      const routeEnd=nextHotel?nextHotelQ:hotelQ;
+      const routeEndLabel=nextHotel?`→ ${nextHotel.city} Hotel`:'→ Hotel';
+
       // ── External open-in-Google-Maps link ────────────────────────────
       const wps=places.map(p=>esc(p.name+', '+city+country));
       const googleDirUrl=places.length
-        ?`https://www.google.com/maps/dir/?api=1&origin=${esc(hotelQ)}&destination=${esc(hotelQ)}&waypoints=${wps.join('|')}&travelmode=driving`
-        :`https://www.google.com/maps/search/?api=1&query=${esc(hotelQ)}`;
+        ?`https://www.google.com/maps/dir/?api=1&origin=${esc(hotelQ)}&destination=${esc(routeEnd)}&waypoints=${wps.join('|')}&travelmode=driving`
+        :nextHotel
+          ?`https://www.google.com/maps/dir/?api=1&origin=${esc(hotelQ)}&destination=${esc(routeEnd)}&travelmode=driving`
+          :`https://www.google.com/maps/search/?api=1&query=${esc(hotelQ)}`;
       const amapUrl=`https://www.amap.com/dir?origin[name]=${encodeURIComponent(h.name)}&destination[name]=${encodeURIComponent((places[0]?.name||city)+', '+city)}&type=walk&src=travel-pro`;
 
       const mapCardId='city-map-'+d.hotelIdx;
@@ -3846,15 +3943,21 @@ function buildCityMaps(t){
           +(places.length?'<div style="font-size:.7rem;color:#1a3557;font-weight:600;margin-bottom:.4rem">Directions (hotel → attraction):</div><div style="display:flex;flex-wrap:wrap;gap:.45rem;margin-bottom:.5rem">'+_cnPlaceLinks+'</div>':'')
           +'</div>';
       } else if(places.length){
-        // Route: hotel → each attraction → hotel (driving)
+        // Route: hotel → attractions → next hotel (if moving on) or back to same hotel (last city)
         const _gmO=encodeURIComponent(hotelQ);
         const _gmStops=places.map(p=>encodeURIComponent(p.name+', '+city+country));
-        const _gmD=_gmStops.join('+to:')+'+to:'+encodeURIComponent(hotelQ);
+        const _gmD=_gmStops.join('+to:')+'+to:'+encodeURIComponent(routeEnd);
         _cityMapHtml='<iframe src="https://maps.google.com/maps?saddr='+_gmO+'&daddr='+_gmD+'&output=embed&hl=en&dirflg=d"'
           +' style="height:300px;width:100%;border:0;display:block"'
           +' loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>';
+      } else if(nextHotel){
+        // No attractions but moving to next city — show direct route hotel → next hotel
+        const _gmO=encodeURIComponent(hotelQ);
+        _cityMapHtml='<iframe src="https://maps.google.com/maps?saddr='+_gmO+'&daddr='+encodeURIComponent(routeEnd)+'&output=embed&hl=en&dirflg=d"'
+          +' style="height:300px;width:100%;border:0;display:block"'
+          +' loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>';
       } else {
-        // No attractions — just centre on the hotel
+        // Last city, no attractions — just centre on the hotel
         _cityMapHtml='<iframe src="https://maps.google.com/maps?q='+encodeURIComponent(hotelQ)+'&output=embed&hl=en&z=15"'
           +' style="height:300px;width:100%;border:0;display:block"'
           +' loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>';
@@ -3886,7 +3989,9 @@ function buildCityMaps(t){
         <div class="wpts-row" style="flex-wrap:wrap">
           <div class="wpt" style="background:var(--gold-ll);border:1px solid var(--gold);font-weight:600">🏨 ${h.name}</div>
           ${places.map(p=>`<div class="wpt-seg">→</div><div class="wpt">${typeIcon[p.type]||'📍'} ${p.name}</div>`).join('')}
-          ${places.length?`<div class="wpt-seg">→</div><div class="wpt" style="color:var(--ink-ll);font-size:.73rem">🏨 return</div>`:''}
+          ${nextHotel
+            ?`<div class="wpt-seg">→</div><div class="wpt" style="background:#EAF4F0;border:1px solid var(--teal);font-size:.73rem">🏨 ${nextHotel.city} Hotel</div>`
+            :places.length?`<div class="wpt-seg">→</div><div class="wpt" style="color:var(--ink-ll);font-size:.73rem">🏨 return</div>`:''}
         </div>
         ${_cityMapHtml}
         ${_tipHtml}
@@ -3896,7 +4001,7 @@ function buildCityMaps(t){
   container.innerHTML=cardData.length
     ?`<div class="sec-hdr" style="margin-top:1.2rem">
         <div class="sec-title">🏙 City Maps</div>
-        <div class="muted" style="font-size:.72rem">Route: hotel → attractions → hotel. Tap the map button for turn-by-turn directions.</div>
+        <div class="muted" style="font-size:.72rem">Route: hotel → attractions → next city's hotel (or return if last stop). Tap the map button for turn-by-turn directions.</div>
       </div>`+cards.join('')
     :'';
 
@@ -7156,10 +7261,8 @@ function exportAllToGCal(){
   }
 
   const actCount=(tripData.days||[]).reduce((s,d)=>s+(d.activities||[]).length,0);
-  const segCount=(tripData.transportSummary||[]).length;
   const htlCount=(tripData.hotels||[]).length;
-
-  _showCalShareModal(safeName, actCount, segCount, htlCount, validEvents.length);
+  toast(`✓ Calendar downloaded — ${validEvents.length} events (${actCount} activities · ${htlCount} hotels). Import the .ics file into Google Calendar, Outlook, or Apple Calendar.`, 6000);
 }
 
 function _showCalShareModal(safeName, actCount, segCount, htlCount, total){
