@@ -1826,37 +1826,68 @@ function renderChips(idx,val){
 
 async function _fetchWikiChips(idx,cityName){
   const cacheKey='_wikiChip_'+cityName.toLowerCase();
-  if(window[cacheKey]===false)return;               // confirmed not a place
+  if(window[cacheKey]===false)return;
   const wrap=$('suggest-wrap');
   if(!wrap)return;
-  // Remove stale block if user re-typed quickly
   const stale=$('sb-'+idx);if(stale)stale.remove();
   try{
     const ctrl=new AbortController();
-    setTimeout(()=>ctrl.abort(),5000);
-    const r=await fetch(
-      `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(cityName)}`,
-      {signal:ctrl.signal}
-    );
-    if(!r.ok){window[cacheKey]=false;return;}
-    const d=await r.json();
-    // Accept only settlement/place pages
+    setTimeout(()=>ctrl.abort(),10000);
+    const sig=ctrl.signal;
+
+    // Step 1 — confirm it's a city/place
+    const sumRes=await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(cityName)}`,{signal:sig});
+    if(!sumRes.ok){window[cacheKey]=false;return;}
+    const sumData=await sumRes.json();
     const placeRe=/city|town|municipalit|village|prefecture|province|region|district|capital|settlement|county|borough|commune|island/i;
-    const looksLikePlace=placeRe.test(d.description||'')||placeRe.test((d.extract||'').slice(0,120));
-    if(!d.extract||!looksLikePlace){window[cacheKey]=false;return;}
-    window[cacheKey]=d;
-    // Guard: user may have moved on
-    if($('sb-'+idx))return;
+    const isPlace=placeRe.test(sumData.description||'')||placeRe.test((sumData.extract||'').slice(0,150));
+    if(!sumData.extract||!isPlace){window[cacheKey]=false;return;}
+
+    // Step 2 — fetch mobile sections, find tourism/sights section
+    let places=[];
+    try{
+      const secRes=await fetch(`https://en.wikipedia.org/api/rest_v1/page/mobile-sections/${encodeURIComponent(cityName)}`,{signal:sig});
+      if(secRes.ok){
+        const secData=await secRes.json();
+        const tourRe=/tourism|attraction|sight|point.?of.?interest|things.?to.?do|landmark|heritage|destination|notable.?place/i;
+        const allSec=(secData.remaining?.sections||[]);
+        const tourSec=allSec.find(s=>tourRe.test(s.line||s.anchor||''));
+        if(tourSec?.text){
+          const html=tourSec.text;
+          const boldRe=/<b[^>]*>([^<]{3,55})<\/b>/gi;
+          const linkRe=/<a[^>]+title="([^"]{3,60})"[^>]*>/gi;
+          const bolds=[...html.matchAll(boldRe)].map(m=>m[1].trim());
+          const links=[...html.matchAll(linkRe)].map(m=>m[1].trim());
+          places=[...new Set([...bolds,...links])]
+            .filter(n=>n.length>3&&!/wikipedia|file:|category:|template:|disambiguation/i.test(n))
+            .slice(0,8);
+        }
+      }
+    }catch(e2){}
+
+    window[cacheKey]={places,extract:sumData.extract||''};
+    if($('sb-'+idx))return; // user moved on / DB block appeared
+
     const block=document.createElement('div');
     block.className='suggest-block';block.id='sb-'+idx;
-    const snippet=(d.extract||'').slice(0,220).replace(/</g,'&lt;');
-    const trail=d.extract&&d.extract.length>220?'…':'';
-    block.innerHTML=`
-      <div class="sb-hdr">
-        <div class="sb-label-text">🌐 <span class="sb-dest">${cityName}</span> — found online</div>
-      </div>
-      <div style="font-size:.78rem;color:var(--ink-l);padding:.25rem .1rem .45rem;line-height:1.55">${snippet}${trail}</div>
-      <div class="chips-hint" style="color:var(--teal);font-style:normal">✓ AI will suggest top attractions for <strong>${cityName}</strong> when you generate your itinerary</div>`;
+
+    if(places.length>=2){
+      block.innerHTML=`
+        <div class="sb-hdr">
+          <div class="sb-label-text">🌐 Notable places in <span class="sb-dest">${cityName}</span></div>
+        </div>
+        <div class="chips">${places.map(p=>`<div class="chip" style="opacity:.82;cursor:default;pointer-events:none"><span class="chip-e">📍</span><span>${p.replace(/</g,'&lt;')}</span></div>`).join('')}</div>
+        <div class="chips-hint" style="color:var(--teal);font-style:normal">✓ AI will include top attractions for <strong>${cityName}</strong> in your itinerary</div>`;
+    }else{
+      const snippet=(sumData.extract||'').slice(0,220).replace(/</g,'&lt;');
+      const trail=(sumData.extract||'').length>220?'…':'';
+      block.innerHTML=`
+        <div class="sb-hdr">
+          <div class="sb-label-text">🌐 <span class="sb-dest">${cityName}</span> — found online</div>
+        </div>
+        <div style="font-size:.78rem;color:var(--ink-l);padding:.25rem .1rem .45rem;line-height:1.55">${snippet}${trail}</div>
+        <div class="chips-hint" style="color:var(--teal);font-style:normal">✓ AI will suggest top attractions for <strong>${cityName}</strong> when you generate your itinerary</div>`;
+    }
     wrap.appendChild(block);
   }catch(e){}
 }
@@ -1892,7 +1923,14 @@ function updateDynamicSections(){
 
 function updateSeasonBox(key){
   const box=$('season-box');
-  const seasons=key&&SEASONS[key];
+  let seasons=key&&SEASONS[key];
+  // Fallback: if no city-specific seasons, detect country from the typed destination and use country-level data
+  if(!seasons){
+    const cityStr=(getDestinations()[0]||'');
+    for(const[re,ckey] of COUNTRY_DETECT){
+      if(re.test(cityStr)&&SEASONS[ckey]){seasons=SEASONS[ckey];break;}
+    }
+  }
   if(!seasons){box.style.display='none';return;}
   box.style.display='block';
   const dests=getDestinations();
@@ -2053,11 +2091,13 @@ const CALL={gemini:callGemini,deepseek:callDeepSeek,anthropic:callAnthropic,open
 
 function fbEntry(p,state,err=''){
   const en=$('fb-entries');let el=$('fb_'+p);
-  const html=`<div class="fb-entry" id="fb_${p}"><div class="fb-dot ${state}"></div><span class="fb-text">${P_LABELS[p]}</span>
+  const isFmtErr=err.includes('format issue');
+  const errColor=isFmtErr?'#E67E22':'#E74C3C'; // amber for format issues, red for hard errors
+  const errIcon=isFmtErr?'⚠':'✗';
+  const html=`<div class="fb-entry" id="fb_${p}"><div class="fb-dot ${state}" style="${isFmtErr?'background:#E67E22':''}"></div><span class="fb-text">${P_LABELS[p]}</span>
     ${state==='trying'?'<em style="color:rgba(240,200,122,.5);font-size:.6rem"> trying…</em>':''}
     ${state==='ok'?'<span style="color:#27AE60;margin-left:.3rem">✓ success</span>':''}
-    ${state==='err'?`<span style="color:#E74C3C;margin-left:.3rem">✗</span><span class="fb-err">${err.slice(0,90)}</span>`:''}
-
+    ${state==='err'?`<span style="color:${errColor};margin-left:.3rem">${errIcon}</span><span class="fb-err" style="color:${errColor}">${err.slice(0,90)}</span>`:''}
     ${state==='skip'?'<span style="color:#7F8C8D;margin-left:.3rem;font-size:.6rem">no key — skipped</span>':''}
   </div>`;
   if(el)el.outerHTML=html;else en.insertAdjacentHTML('beforeend',html);
@@ -2074,9 +2114,10 @@ async function callWithFallback(prompt,validate=null){
     if(!key&&!NETLIFY_MODE){fbEntry(p,'skip');errors[p]='no key';continue;}
     fbEntry(p,'trying');
     $('load-txt').textContent='Trying '+P_LABELS[p]+(NETLIFY_MODE?' (via proxy)':'')+'…';
-    // Retry up to 2× within same provider for JSON validation failures (Gemini occasionally
-    // prepends preamble text before the JSON on the first attempt)
-    for(let attempt=0;attempt<2;attempt++){
+    // Retry up to 3× within same provider for JSON validation failures (Gemini occasionally
+    // prepends preamble text or omits the closing brace on large responses)
+    const maxAttempts=p==='gemini'?3:2;
+    for(let attempt=0;attempt<maxAttempts;attempt++){
       try{
         const text=await CALL[p](prompt,key,model);
         if(validate)validate(text);
@@ -2084,19 +2125,21 @@ async function callWithFallback(prompt,validate=null){
         const dot=$('adot-'+p);if(dot)dot.className='api-dot ok';
         return{text,provider:p,model};
       }catch(err){
-        const isJsonErr=err.message.includes('No JSON')||err.message.includes('no usable');
-        if(attempt===0&&isJsonErr){
-          // Transient JSON response — retry once silently before giving up on this provider
+        const isJsonErr=err.message.includes('No JSON')||err.message.includes('no usable')||err.message.includes('parse');
+        if(attempt<maxAttempts-1&&isJsonErr){
+          // Transient bad-format response — retry before giving up on this provider
           fbEntry(p,'trying');
-          $('load-txt').textContent='Retrying '+P_LABELS[p]+'…';
-          await new Promise(r=>setTimeout(r,800));
+          $('load-txt').textContent=`Retrying ${P_LABELS[p]} (${attempt+2}/${maxAttempts})…`;
+          await new Promise(r=>setTimeout(r,900));
           continue;
         }
-        fbEntry(p,'err',err.message);
-        errors[p]=err.message.slice(0,60);
+        // Show "format issue" instead of raw "No JSON found" — less alarming, clearer intent
+        const dispErr=isJsonErr?'response format issue — trying next provider':err.message.slice(0,60);
+        fbEntry(p,'err',dispErr);
+        errors[p]=dispErr;
         const dot=$('adot-'+p);if(dot)dot.className='api-dot err';
         if(PROVIDERS.filter(q=>localStorage.getItem('tppK_'+q)||NETLIFY_MODE).length>1)
-          toast('⚠ '+P_LABELS[p]+' failed → trying next…',2500);
+          toast('⚠ '+P_LABELS[p]+' retried — trying next…',2000);
         break;
       }
     }
@@ -2472,7 +2515,7 @@ Return ONLY valid JSON — no markdown, no code fences, nothing outside JSON:
     /* IMPORTANT — auto-select correct apps by destination:
        Korea → eHailing: KakaoTaxi, maps: KakaoMap + Naver Map, eWallet: Kakao Pay / Naver Pay / TNG Alipay+, food: Baemin / Coupang Eats
        Japan → eHailing: GO/Uber Japan, maps: Google Maps + Navitime, eWallet: Suica / IC Card / TNG Alipay+, food: Uber Eats / Demae-can
-       China → eHailing: DiDi, maps: Amap (高德) + Baidu Maps, eWallet: Alipay + WeChat Pay, food: Meituan / Eleme
+       China → eHailing: DiDi, maps: Google Maps + Amap (高德) + Baidu Maps, eWallet: Alipay + WeChat Pay, food: Meituan / Eleme
        Thailand → eHailing: Grab, maps: Google Maps, eWallet: TrueMoney / PromptPay / TNG Alipay+
        Singapore/Malaysia → eHailing: Grab, maps: Google Maps, eWallet: GrabPay / Touch n Go
        Always add Google Translate to other.apps. Add Papago if Korea or Japan. Add Klook to other.apps for any Asian destination.
@@ -3706,46 +3749,8 @@ function buildMap(t){
     const _routeIsCN=CHINA_RE.test(_routeAllDests);
     const firstCity=mapWps[0]||'';
 
-    if(_routeIsCN){
-      // China: show Leaflet/OSM for visual route overview + Amap nav card below for navigation
-      // Leaflet works globally (OSM tiles are not blocked in China); Google Maps is blocked
-      const _cnWrap=document.createElement('div');
-      _cnWrap.id='map-frame-leaflet';
-      _cnWrap.style.cssText='width:100%;border-radius:6px;display:block;overflow:hidden;border:1px solid var(--border)';
-
-      // Leaflet map div
-      const _lDiv=document.createElement('div');
-      _lDiv.id='map-frame-leaflet-inner';
-      _lDiv.style.cssText='width:100%;height:380px;background:var(--sand-d);z-index:0;position:relative';
-      _cnWrap.appendChild(_lDiv);
-
-      // Amap navigation card beneath the map
-      const _legLinks=[];
-      for(let _li=0;_li<mapWps.length-1;_li++){
-        const _from=mapWps[_li],_to=mapWps[_li+1];
-        const _amapLeg='https://www.amap.com/dir?from[name]='+encodeURIComponent(_from)+'&to[name]='+encodeURIComponent(_to)+'&type=driving&src=travel-pro';
-        _legLinks.push('<a href="'+_amapLeg+'" target="_blank" style="display:inline-flex;align-items:center;gap:.35rem;padding:.42rem .85rem;background:#1677ff;color:#fff;border-radius:6px;font-size:.8rem;font-weight:600;text-decoration:none;white-space:nowrap">🗺 '+_from+' → '+_to+' ↗</a>');
-      }
-      const _navCard=document.createElement('div');
-      _navCard.style.cssText='padding:1rem 1.1rem;background:linear-gradient(135deg,#e8f2ff,#f0f7ff);border-top:1px solid #c5d8f0';
-      _navCard.innerHTML='<div style="font-size:.78rem;font-weight:700;color:#1a3557;margin-bottom:.5rem">🗺 导航 Navigate with Amap — Google Maps unavailable in China</div>'
-        +'<div style="display:flex;flex-wrap:wrap;gap:.45rem;margin-bottom:.5rem">'+_legLinks.join('')+'</div>'
-        +'<div style="display:flex;gap:.45rem;flex-wrap:wrap">'
-        +'<a href="https://www.amap.com/search?query='+encodeURIComponent(firstCity)+'" target="_blank" style="padding:.32rem .7rem;background:#fff;border:1px solid #1677ff;color:#1677ff;border-radius:6px;font-size:.74rem;font-weight:600;text-decoration:none">🔍 Search Amap ↗</a>'
-        +'<a href="https://map.baidu.com/search/'+encodeURIComponent(firstCity)+'" target="_blank" style="padding:.32rem .7rem;background:#fff;border:1px solid #3385ff;color:#3385ff;border-radius:6px;font-size:.74rem;font-weight:600;text-decoration:none">🗺 百度地图 ↗</a>'
-        +'</div>';
-      _cnWrap.appendChild(_navCard);
-      mapFrame.parentNode.insertBefore(_cnWrap,mapFrame);
-
-      // Build Leaflet route map
-      let cityPlaces=mapWps.slice(1).map(w=>({name:w,type:'attraction'}));
-      if(cityPlaces.length===0){
-        const attractions=(t.mustSeeAttractions||[]).slice(0,5).map(a=>({name:a.name,type:'attraction'}));
-        cityPlaces=attractions;
-      }
-      _buildLeafletMap('map-frame-leaflet-inner', cityPlaces, firstCity, firstCity, true);
-    } else {
-      // Non-China: Google Maps embed (driving route between waypoints)
+    {
+      // Google Maps embed — works globally including China
       let _gmSrc;
       if(mapWps.length>=2){
         const _gmO=encodeURIComponent(mapWps[0]);
@@ -3754,14 +3759,35 @@ function buildMap(t){
       } else {
         _gmSrc=`https://maps.google.com/maps?q=${encodeURIComponent(firstCity||wps[0]||'')}&output=embed&hl=en&z=12`;
       }
+      const _gmWrap=document.createElement('div');
+      _gmWrap.id='map-frame-leaflet';
+      _gmWrap.style.cssText='width:100%;border-radius:6px;overflow:hidden;border:1px solid var(--border)';
       const _gmIframe=document.createElement('iframe');
-      _gmIframe.id='map-frame-leaflet';
       _gmIframe.src=_gmSrc;
-      _gmIframe.style.cssText='width:100%;height:480px;border:0;border-radius:6px;display:block';
+      _gmIframe.style.cssText='width:100%;height:480px;border:0;display:block';
       _gmIframe.setAttribute('loading','lazy');
       _gmIframe.setAttribute('referrerpolicy','no-referrer-when-downgrade');
       _gmIframe.setAttribute('allowfullscreen','');
-      mapFrame.parentNode.insertBefore(_gmIframe,mapFrame);
+      _gmWrap.appendChild(_gmIframe);
+
+      // China: add optional Amap / Baidu links below the Google Maps embed
+      if(_routeIsCN&&mapWps.length>=2){
+        const _legLinks=[];
+        for(let _li=0;_li<mapWps.length-1;_li++){
+          const _from=mapWps[_li],_to=mapWps[_li+1];
+          const _amapLeg='https://www.amap.com/dir?from[name]='+encodeURIComponent(_from)+'&to[name]='+encodeURIComponent(_to)+'&type=driving&src=travel-pro';
+          _legLinks.push('<a href="'+_amapLeg+'" target="_blank" style="display:inline-flex;align-items:center;gap:.3rem;padding:.32rem .72rem;background:#1677ff;color:#fff;border-radius:6px;font-size:.74rem;font-weight:600;text-decoration:none;white-space:nowrap">'+_from+' → '+_to+' ↗</a>');
+        }
+        const _altCard=document.createElement('div');
+        _altCard.style.cssText='padding:.65rem 1rem;background:var(--sand);border-top:1px solid var(--border);font-size:.72rem;color:var(--ink-l)';
+        _altCard.innerHTML='<details style="cursor:pointer"><summary style="font-weight:600;color:var(--ink-l);list-style:none;display:flex;align-items:center;gap:.4rem"><span>🗺 Also navigate with Amap (高德) or Baidu Maps</span></summary>'
+          +'<div style="margin-top:.55rem;display:flex;flex-wrap:wrap;gap:.38rem">'+_legLinks.join('')
+          +'<a href="https://www.amap.com/search?query='+encodeURIComponent(firstCity)+'" target="_blank" style="padding:.32rem .7rem;background:#fff;border:1px solid #1677ff;color:#1677ff;border-radius:6px;font-size:.72rem;font-weight:600;text-decoration:none">🔍 Amap ↗</a>'
+          +'<a href="https://map.baidu.com/search/'+encodeURIComponent(firstCity)+'" target="_blank" style="padding:.32rem .7rem;background:#fff;border:1px solid #3385ff;color:#3385ff;border-radius:6px;font-size:.72rem;font-weight:600;text-decoration:none">🗺 百度地图 ↗</a>'
+          +'</div></details>';
+        _gmWrap.appendChild(_altCard);
+      }
+      mapFrame.parentNode.insertBefore(_gmWrap,mapFrame);
     }
   }
 
@@ -3825,6 +3851,21 @@ function cleanPlaceName(name){
     .replace(/\s*—.*$/,'')         // strip em-dash descriptions
     .trim();
 }
+
+// Lat/lon for major Chinese cities — used for OpenStreetMap embed
+const CHINA_CITY_LL={
+  beijing:[39.9042,116.4074],shanghai:[31.2304,121.4737],xian:[34.3416,108.9398],
+  hangzhou:[30.2741,120.1551],suzhou:[31.2990,120.5853],chengdu:[30.5728,104.0668],
+  guilin:[25.2736,110.2906],guangzhou:[23.1291,113.2644],shenzhen:[22.5431,114.0579],
+  chongqing:[29.5630,106.5516],nanjing:[32.0603,118.7969],wuhan:[30.5928,114.3055],
+  kunming:[25.0389,102.7183],zhengzhou:[34.7466,113.6254],luoyang:[34.6197,112.4541],
+  harbin:[45.8038,126.5350],qingdao:[36.0671,120.3826],xiamen:[24.4798,118.0894],
+  dalian:[38.9140,121.6147],sanya:[18.2528,109.5119],zhangjiajie:[29.1172,110.4790],
+  lijiang:[26.8721,100.2299],dali:[25.6065,100.2679],pingyao:[37.1892,112.1769],
+  lhasa:[29.6500,91.1000],changsha:[28.2278,112.9388],fuzhou:[26.0745,119.2965],
+  jinan:[36.6512,117.1201],ningbo:[29.8683,121.5440],shenyang:[41.8057,123.4315],
+  taiyuan:[37.8706,112.5489],hefei:[31.8205,117.2272],urumqi:[43.7928,87.6017],
+};
 
 // Mainland China cities → append ", China"
 const CHINA_RE=/\b(china|shanghai|beijing|suzhou|hangzhou|guangzhou|shenzhen|chengdu|nanjing|wuhan|xi.?an|xian|guilin|chongqing|kunming|zhengzhou|luoyang|harbin|qingdao|xiamen|dalian|sanya|zhangjiajie|lijiang|dali|pingyao|lhasa|tibet|urumqi|xinjiang|hefei|fuzhou|wenzhou|changsha|taiyuan|shijiazhuang|jinan|ningbo|wuxi|changchun|shenyang|zhejiang|jiangsu|sichuan|yunnan|guangdong|henan|hunan|anhui|hubei|liaoning|jilin|heilongjiang|shaanxi|shanxi|gansu|qinghai|shandong)\b/i;
@@ -3922,26 +3963,41 @@ function buildCityMaps(t){
       // Pre-compute map embed HTML to avoid nested template literal issues
       // Build Google Maps route: hotel → attraction1 → attraction2 → ... → hotel
       let _cityMapHtml;
-      if(isCN){
-        // China: Amap navigation card — Google Maps blocked, use Amap (高德) with Chinese names for accuracy
+      if(isCN&&places.length){
+        // China — Google Maps embed (primary) + optional Amap/Baidu links below
+        const _gmO=encodeURIComponent(hotelQ);
+        const _gmStops=places.map(p=>encodeURIComponent(p.name+', '+city+', China'));
+        const _gmD=_gmStops.join('+to:')+'+to:'+encodeURIComponent(routeEnd);
         const _hotelCN=encodeURIComponent((h.nameZh||h.name)+(h.addressZh||h.address?', '+(h.addressZh||h.address):''));
-        const _hotelSearchUrl='https://www.amap.com/search?query='+encodeURIComponent((h.nameZh||h.name)+' '+(city));
         const _cnPlaceLinks=places.map(p=>{
           const _pCN=encodeURIComponent((p.nameZh||p.name)+', '+city);
           const _pLabel=(p.nameZh||p.name);
-          return '<a href="https://www.amap.com/dir?from[name]='+_hotelCN+'&to[name]='+_pCN+'&type=driving&src=travel-pro" target="_blank" style="display:inline-flex;align-items:center;gap:.3rem;padding:.38rem .75rem;background:#1677ff;color:#fff;border-radius:6px;font-size:.76rem;font-weight:600;text-decoration:none;white-space:nowrap">→ '+(_pLabel.length>18?_pLabel.slice(0,17)+'…':_pLabel)+' ↗</a>';
+          return '<a href="https://www.amap.com/dir?from[name]='+_hotelCN+'&to[name]='+_pCN+'&type=driving&src=travel-pro" target="_blank" style="display:inline-flex;align-items:center;gap:.28rem;padding:.3rem .65rem;background:#1677ff;color:#fff;border-radius:6px;font-size:.72rem;font-weight:600;text-decoration:none;white-space:nowrap">→ '+(_pLabel.length>18?_pLabel.slice(0,17)+'…':_pLabel)+' ↗</a>';
         }).join('');
         const _cnHotelSearch='https://www.amap.com/search?query='+encodeURIComponent((h.nameZh||h.name)+' '+city);
         const _cnBaidu='https://map.baidu.com/search/'+encodeURIComponent((h.nameZh||h.name)+' '+city);
-        _cityMapHtml='<div style="padding:1.2rem 1.1rem;background:linear-gradient(135deg,#e8f2ff,#f0f7ff);border-top:1px solid #c5d8f0;min-height:160px">'
-          +'<div style="font-size:.82rem;font-weight:700;color:#1a3557;margin-bottom:.25rem">🗺 导航 Navigate in '+city+'</div>'
-          +'<div style="font-size:.7rem;color:#4a6fa5;margin-bottom:.6rem">Google Maps unavailable in China. Use Amap (高德地图) or Baidu Maps below:</div>'
-          +'<div style="display:flex;gap:.45rem;flex-wrap:wrap;margin-bottom:.7rem">'
-          +'<a href="'+_cnHotelSearch+'" target="_blank" style="padding:.35rem .75rem;background:#1677ff;color:#fff;border-radius:6px;font-size:.74rem;font-weight:600;text-decoration:none">🏨 Find Hotel on Amap ↗</a>'
-          +'<a href="'+_cnBaidu+'" target="_blank" style="padding:.35rem .75rem;background:#3385ff;color:#fff;border-radius:6px;font-size:.74rem;font-weight:600;text-decoration:none">🗺 百度地图 Find Hotel ↗</a>'
-          +'</div>'
-          +(places.length?'<div style="font-size:.7rem;color:#1a3557;font-weight:600;margin-bottom:.4rem">Directions (hotel → attraction):</div><div style="display:flex;flex-wrap:wrap;gap:.45rem;margin-bottom:.5rem">'+_cnPlaceLinks+'</div>':'')
-          +'</div>';
+        _cityMapHtml='<iframe src="https://maps.google.com/maps?saddr='+_gmO+'&daddr='+_gmD+'&output=embed&hl=en&dirflg=d"'
+          +' style="height:300px;width:100%;border:0;display:block"'
+          +' loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>'
+          +'<div style="padding:.55rem 1rem;background:var(--sand);border-top:1px solid var(--border)">'
+          +'<details style="cursor:pointer"><summary style="font-size:.7rem;font-weight:600;color:var(--ink-l);list-style:none;display:flex;align-items:center;gap:.35rem"><span>🗺 Also navigate with Amap (高德地图) or Baidu Maps</span></summary>'
+          +'<div style="margin-top:.45rem;display:flex;flex-wrap:wrap;gap:.38rem">'
+          +'<a href="'+_cnHotelSearch+'" target="_blank" style="padding:.28rem .6rem;background:#1677ff;color:#fff;border-radius:6px;font-size:.7rem;font-weight:600;text-decoration:none">🏨 Hotel · Amap ↗</a>'
+          +'<a href="'+_cnBaidu+'" target="_blank" style="padding:.28rem .6rem;background:#2663d1;color:#fff;border-radius:6px;font-size:.7rem;font-weight:600;text-decoration:none">🗺 百度地图 ↗</a>'
+          +_cnPlaceLinks+'</div></details></div>';
+      } else if(isCN){
+        // China, no attractions — just centre on the hotel
+        const _cnHotelSearch='https://www.amap.com/search?query='+encodeURIComponent((h.nameZh||h.name)+' '+city);
+        const _cnBaidu='https://map.baidu.com/search/'+encodeURIComponent((h.nameZh||h.name)+' '+city);
+        _cityMapHtml='<iframe src="https://maps.google.com/maps?q='+encodeURIComponent(hotelQ+', China')+'&output=embed&hl=en&z=14"'
+          +' style="height:300px;width:100%;border:0;display:block"'
+          +' loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>'
+          +'<div style="padding:.55rem 1rem;background:var(--sand);border-top:1px solid var(--border)">'
+          +'<details style="cursor:pointer"><summary style="font-size:.7rem;font-weight:600;color:var(--ink-l);list-style:none;display:flex;gap:.35rem"><span>🗺 Also navigate with Amap (高德地图) or Baidu Maps</span></summary>'
+          +'<div style="margin-top:.45rem;display:flex;gap:.38rem;flex-wrap:wrap">'
+          +'<a href="'+_cnHotelSearch+'" target="_blank" style="padding:.28rem .6rem;background:#1677ff;color:#fff;border-radius:6px;font-size:.7rem;font-weight:600;text-decoration:none">🏨 Hotel · Amap ↗</a>'
+          +'<a href="'+_cnBaidu+'" target="_blank" style="padding:.28rem .6rem;background:#2663d1;color:#fff;border-radius:6px;font-size:.7rem;font-weight:600;text-decoration:none">🗺 百度地图 ↗</a>'
+          +'</div></details></div>';
       } else if(places.length){
         // Route: hotel → attractions → next hotel (if moving on) or back to same hotel (last city)
         const _gmO=encodeURIComponent(hotelQ);
@@ -3964,7 +4020,8 @@ function buildCityMaps(t){
       }
 
       // Tip note below map
-      const _tipHtml=isCN?''
+      const _tipHtml=isCN?('<div style="padding:.45rem .95rem;background:var(--sand);border-top:1px solid var(--border);font-size:.71rem;color:var(--ink-ll)">'
+          +'💡 Google Maps works well in China. For local transit &amp; walking, also try <strong>Amap 高德地图</strong> or <strong>百度地图</strong> — expand the link above.</div>')
         :isTW?('<div style="padding:.45rem .95rem;background:var(--sand);border-top:1px solid var(--border);font-size:.71rem;color:var(--ink-ll)">'
           +'💡 Google Maps works great in Taiwan. Use <a href="https://www.metro.taipei/en/" target="_blank" style="color:#e3000f;font-weight:600">Taipei Metro ↗</a> for MRT routes. EasyCard (悠遊卡) covers metro, buses &amp; YouBike.</div>')
         :isKorea?('<div style="padding:.45rem .95rem;background:var(--sand);border-top:1px solid var(--border);font-size:.71rem;color:var(--ink-ll)">'
@@ -3972,9 +4029,7 @@ function buildCityMaps(t){
         :'';
 
       // One primary map button per destination
-      const _mapBtn=isCN
-        ?'<a href="'+amapUrl+'" target="_blank" class="btn btn-ghost btn-sm" style="color:#1677ff;border-color:#1677ff">🗺 高德地图 (Amap) ↗</a>'
-        :isKorea
+      const _mapBtn=isKorea
         ?'<a href="https://map.kakao.com/?q='+encodeURIComponent(hotelQ)+'" target="_blank" class="btn btn-ghost btn-sm" style="color:#f9b800;background:#1a0f00;border-color:#5D3A1A">🗺 카카오맵 ↗</a>'
         :'<a href="'+googleDirUrl+'" target="_blank" class="btn btn-ghost btn-sm">🗺 Google Maps ↗</a>';
 
@@ -4005,7 +4060,7 @@ function buildCityMaps(t){
       </div>`+cards.join('')
     :'';
 
-  // No Leaflet needed: China uses Amap nav cards, non-China uses Google Maps iframes
+  // All cities use Google Maps embeds; China cards additionally show optional Amap/Baidu links
 }
 
 function changeHotel(idx){
@@ -4172,7 +4227,7 @@ function buildDays(t,total){
       :day.title||'';
     d.innerHTML=`<div class="day-hdr">
       <div class="day-hdr-l"><div class="day-num">${day.dayNumber}</div><div class="day-ttl">Day ${day.dayNumber}: ${titleHtml}</div></div>
-      <div class="day-meta"><span>${day.theme||''}</span>${day.date?`<span>${fmtD(day.date)}</span>`:''} ${day.city?`<span>📍 ${day.city}</span>`:''}</div>
+      <div class="day-meta">${day.date?`<span>${fmtD(day.date)}</span>`:''}</div>
     </div><div>${(day.activities||[]).map((a,ai)=>{
       const icon=a.emoji||icons[a.type]||'📍';
       const lnks=[];
@@ -6837,6 +6892,14 @@ function loadDemo(){
     $('badge-pack').style.display='inline';
     buildPacking(tripData.packingList,[]);
   }catch(e){}
+
+  // Strip theme/city from demo day headers — keep only date & weather badge
+  document.querySelectorAll('.day-meta').forEach(meta=>{
+    [...meta.children].forEach(span=>{
+      if(!span.classList.contains('wx-badge')&&(span.textContent.includes('📍')||/^\s*[\u{1F300}-\u{1FFFF}]/u.test(span.textContent)))
+        span.remove();
+    });
+  });
 
   goTab('itin');
   if(NETLIFY_MODE){
