@@ -29,7 +29,7 @@ app.post('/api/anthropic', async (req, res) => {
   if (!key) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not set on server' });
   const body = { ...req.body };
   delete body.api_key;
-  body.max_tokens = Math.min(body.max_tokens || 4000, 8000);
+  body.max_tokens = Math.min(body.max_tokens || 8000, 16000);
   await proxy(res,
     'https://api.anthropic.com/v1/messages',
     { 'x-api-key': key, 'anthropic-version': '2023-06-01' },
@@ -42,7 +42,7 @@ app.post('/api/gemini', async (req, res) => {
   const key = process.env.GEMINI_API_KEY;
   if (!key) return res.status(500).json({ error: 'GEMINI_API_KEY not set on server' });
   const body = { ...req.body };
-  const model = body.model || 'gemini-2.0-flash';
+  const model = body.model || 'gemini-2.5-flash';
   delete body.model;
   delete body.api_key;
   await proxy(res,
@@ -57,7 +57,7 @@ app.post('/api/openai', async (req, res) => {
   const body = { ...req.body };
   const model = body.model || '';
   delete body.api_key;
-  body.max_tokens = Math.min(body.max_tokens || 4000, 8000);
+  body.max_tokens = Math.min(body.max_tokens || 8000, 16000);
 
   let key, baseUrl;
   if (model.startsWith('deepseek')) {
