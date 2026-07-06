@@ -1,0 +1,15 @@
+{
+  "name": "travel-planning-pro",
+  "version": "1.0.0",
+  "description": "Travel Planning Pro — Render.com deployment",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
