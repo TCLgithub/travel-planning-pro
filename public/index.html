@@ -473,6 +473,7 @@ a{color:inherit;text-decoration:none}.muted{color:var(--ink-ll);font-size:.72rem
   <div class="main-tab active" id="tab-plan" onclick="goTab('plan')">✏ Plan Trip</div>
   <div class="main-tab" id="tab-itin" onclick="goTab('itin')">📅 Itinerary <span class="tab-badge" id="badge-itin" style="display:none">✓</span></div>
   <div class="main-tab" id="tab-highlights" onclick="goTab('highlights')">⭐ Highlights <span class="tab-badge" id="badge-highlights" style="display:none">✓</span></div>
+  <div class="main-tab" id="tab-journey" onclick="goTab('journey')">🧭 Journey Map <span class="tab-badge" id="badge-journey" style="display:none">✓</span></div>
   <div class="main-tab" id="tab-hotels" onclick="goTab('hotels')">🏨 Hotels <span class="tab-badge" id="badge-hotels" style="display:none">✓</span></div>
   <div class="main-tab" id="tab-map" onclick="goTab('map')">🗺 Map <span class="tab-badge" id="badge-map" style="display:none">✓</span></div>
   <div class="main-tab" id="tab-guide" onclick="goTab('guide')">📖 Local Guide <span class="tab-badge" id="badge-guide" style="display:none">✓</span></div>
@@ -537,7 +538,7 @@ a{color:inherit;text-decoration:none}.muted{color:var(--ink-ll);font-size:.72rem
         <div class="key-row"><label>API Key</label>
           <div class="key-wrap"><input type="password" id="key-gemini" placeholder="AIzaSy…" oninput="saveKey('gemini')" autocomplete="off">
           <button class="eye-btn" onclick="toggleVis('key-gemini',this)">👁</button></div>
-          <div class="key-badge" id="badge-gemini">✓ Saved &nbsp;·&nbsp; <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:var(--teal)">Free key ↗</a></div>
+          <div class="key-badge" id="badge-gemini">✓ Saved &nbsp;·&nbsp; <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:var(--teal)">Manage key ↗</a></div>
         </div>
       </div>
       <div id="apane-deepseek" style="display:none">
@@ -787,9 +788,11 @@ a{color:inherit;text-decoration:none}.muted{color:var(--ink-ll);font-size:.72rem
     <div class="tg" id="transport-tags">
       <button class="tag active" onclick="togTag(this)">✈ Flights</button>
       <button class="tag active" onclick="togTag(this)">🚕 Taxi/Grab</button>
+      <button class="tag" onclick="togTag(this)">🛵 Gojek</button>
       <button class="tag" onclick="togTag(this)">🚄 Train</button>
       <button class="tag" onclick="togTag(this)">🚌 Bus</button>
       <button class="tag" onclick="togTag(this)">🚗 Rental Car</button>
+      <button class="tag" onclick="togTag(this)">🚙 Self-drive</button>
       <button class="tag" onclick="togTag(this)">🚢 Ferry/Boat</button>
       <button class="tag active" onclick="togTag(this)">🚇 Metro/MRT</button>
       <button class="tag" onclick="togTag(this)">🛵 Motorbike</button>
@@ -966,6 +969,31 @@ a{color:inherit;text-decoration:none}.muted{color:var(--ink-ll);font-size:.72rem
       </div>
       <div class="ms-grid" id="ms-grid"></div>
     </div>
+  </div>
+</div>
+</div>
+
+<!-- ══ JOURNEY MAP TAB ══ -->
+<div class="tab-panel" id="panel-journey">
+<div class="page-wrap">
+  <div class="empty-state" id="empty-journey">
+    <div class="empty-icon">🧭</div>
+    <div class="empty-title">No journey map yet</div>
+    <div class="muted">Generate your itinerary to see a fun illustrated trip overview.</div>
+    <button class="btn btn-primary" style="margin-top:1.1rem" onclick="goTab('plan')">← Back to Plan Trip</button>
+  </div>
+  <div id="journey-content" style="display:none">
+    <div class="out-hdr" style="margin-bottom:.6rem">
+      <div>
+        <div class="out-title" id="journey-trip-title"></div>
+        <div style="font-size:.74rem;color:var(--ink-ll);margin-top:.18rem">A fun day-by-day overview of your trip, ready to print or save as a keepsake</div>
+      </div>
+      <div class="out-acts">
+        <button class="btn btn-ghost btn-sm" onclick="goTab('itin')">← Itinerary</button>
+        <button class="pdf-btn" onclick="printTab('journey')">📥 PDF</button>
+      </div>
+    </div>
+    <div id="journey-map-wrap"></div>
   </div>
 </div>
 </div>
@@ -1247,8 +1275,9 @@ const DEST_FOOD = {
 const DEST_TRANSPORT = {
   japan:    ['✈ Flights','🚄 Shinkansen Bullet Train','🚇 Tokyo Metro/Subway','🚌 Highway Bus','🚖 Taxi','🛳 Ferry to Islands'],
   thailand: ['✈ Flights','🛺 Tuk-Tuk','🚕 Grab App','🛵 Scooter Rental','🚌 Minivan/Bus','🛶 Longtail Boat','🚆 BTS Skytrain'],
-  bali:     ['✈ Flights','🛵 Scooter Rental','🚕 Grab App','🚖 Private Driver','🛶 Boat to Islands'],
-  malaysia: ['✈ Flights','🚄 ETS Train','🚕 Grab App','🚇 KL MRT/LRT','🚌 Bus','🛳 Ferry to Islands'],
+  bali:     ['✈ Flights','🛵 Scooter Rental','🛵 Gojek App','🚕 Grab App','🚖 Private Driver','🛶 Boat to Islands'],
+  indonesia:['✈ Flights (domestic)','🛵 Gojek App','🚕 Grab App','🚆 KAI Train (Java)','🚌 Damri Airport Bus','🛳 Ferry Inter-Island'],
+  malaysia: ['✈ Flights','🚙 Self-drive','🚄 ETS Train','🚕 Grab App','🚇 KL MRT/LRT','🚌 Bus','🛳 Ferry to Islands'],
   singapore:['✈ Flights','🚇 MRT (Best option)','🚕 Grab App','🚌 Bus','🛳 Sentosa Cable Car','🚲 Cycling'],
   vietnam:  ['✈ Flights','🛺 Cyclo Rickshaw','🛵 Xe Om Motorbike','🚌 Open Bus','🚕 Grab App','🛳 Halong Cruise'],
   korea:    ['✈ Flights','🚄 KTX High-Speed Train','🚇 Seoul Metro (T-money card)','🚕 KakaoTaxi App','🚌 Express Bus','🛳 Ferry to Jeju/Islands'],
@@ -1282,6 +1311,7 @@ const ALIAS={
   'kl':'malaysia','klcc':'malaysia','kuala lumpur':'malaysia','penang':'malaysia','langkawi':'malaysia','ipoh':'malaysia','johor':'malaysia',
   'chiang mai':'chiang mai','chiang rai':'chiang rai','chiangmai':'chiang mai','chiangrai':'chiang rai','phuket':'thailand','pattaya':'thailand','koh samui':'thailand','krabi':'thailand','hua hin':'thailand',
   'ubud':'bali','seminyak':'bali','uluwatu':'bali','canggu':'bali','kuta':'bali','nusa dua':'bali',
+  'jakarta':'indonesia','yogyakarta':'indonesia','yogya':'indonesia','lombok':'indonesia','surabaya':'indonesia','bandung':'indonesia','indonesia':'indonesia',
   'nara':'japan','hiroshima':'japan','sapporo':'japan','fukuoka':'japan','nagasaki':'japan',
   'florence':'rome','milan':'rome','venice':'rome','naples':'rome',
   'hanoi':'vietnam','saigon':'vietnam','ho chi minh':'vietnam','danang':'vietnam','hoi an':'vietnam',
@@ -1372,7 +1402,7 @@ const COUNTRY_DETECT=[
   [/thailand|thai|bangkok|phuket|chiangmai|chiang\s*mai/i,'thailand'],
   [/bali|ubud|seminyak|canggu/i,'bali'],
   [/indonesia|jakarta|lombok/i,'indonesia'],
-  [/malaysia|kuala\s*lumpur|\bkl\b|penang|langkawi/i,'malaysia'],
+  [/malaysia|kuala\s*lumpur|\bkl\b|penang|langkawi|johor|iskandar|nusajaya|malacca|melaka|ipoh|cameron\s*highlands|fraser|genting|taman\s*negara|kuantan|malaka|selangor|perak|pahang|sabah|sarawak|kuching|kota\s*kinabalu/i,'malaysia'],
   [/singapore/i,'singapore'],
   [/vietnam|vietnamese|hanoi|saigon|danang|hoian/i,'vietnam'],
   [/korea|korean|seoul|busan|jeju/i,'korea'],
@@ -1411,6 +1441,25 @@ const COUNTRY_DETECT=[
 function detectCountryFromName(val){
   for(const[re,key]of COUNTRY_DETECT){if(re.test(val))return key;}
   return null;
+}
+
+// Internal COUNTRY_DETECT key → real-world country name, used to disambiguate
+// map geocoding queries (e.g. "Nusajaya" alone can be mis-geocoded to the
+// far more prominent "Nusa Dua, Bali" unless we append the actual country).
+const KEY_TO_COUNTRY={
+  japan:'Japan',thailand:'Thailand',bali:'Indonesia',indonesia:'Indonesia',malaysia:'Malaysia',
+  singapore:'Singapore',vietnam:'Vietnam',korea:'South Korea',china:'China','hong kong':'Hong Kong',
+  taiwan:'Taiwan',canada:'Canada',usa:'USA',australia:'Australia','new zealand':'New Zealand',
+  uk:'UK',france:'France',italy:'Italy',spain:'Spain',greece:'Greece',germany:'Germany',
+  netherlands:'Netherlands',switzerland:'Switzerland',austria:'Austria',portugal:'Portugal',
+  turkey:'Turkey',india:'India',dubai:'UAE',egypt:'Egypt',morocco:'Morocco',
+  'south africa':'South Africa',peru:'Peru',brazil:'Brazil',mexico:'Mexico',iceland:'Iceland',
+  scandinavia:'Scandinavia',norway:'Norway',sweden:'Sweden',
+};
+// Resolve a real country name from any text blob (destination string, city+context, etc.)
+function countryNameFor(text){
+  const key=detectCountryFromName(text||'');
+  return key?(KEY_TO_COUNTRY[key]||''):'';
 }
 
 function onTripNameInput(val){
@@ -1547,6 +1596,11 @@ function startNewTrip(){
   if($('hotels-content'))$('hotels-content').style.display='none';
   if($('empty-hotels'))$('empty-hotels').style.display='flex';
   $('badge-hotels').style.display='none';
+  // Reset Journey Map tab
+  if($('journey-content'))$('journey-content').style.display='none';
+  if($('empty-journey'))$('empty-journey').style.display='flex';
+  $('badge-journey').style.display='none';
+  if($('journey-map-wrap'))$('journey-map-wrap').innerHTML='';
   // Hide itinerary tab quick-links
   if($('itin-tab-links'))$('itin-tab-links').style.display='none';
   $('sumbar').innerHTML='';
@@ -1590,7 +1644,7 @@ function startNewTrip(){
 
 // ══ TABS ══
 function goTab(t){
-  ['plan','itin','highlights','hotels','map','guide','budget','weather','pack'].forEach(id=>{
+  ['plan','itin','highlights','journey','hotels','map','guide','budget','weather','pack'].forEach(id=>{
     $('tab-'+id)?.classList.toggle('active',id===t);
     $('panel-'+id)?.classList.toggle('active',id===t);
   });
@@ -1991,8 +2045,8 @@ function updateTransportTags(key){
   if(!key){
     // Reset to default transport options
     container.innerHTML=[
-      ['✈ Flights',true],['🚕 Taxi/Grab',true],['🚄 Train',false],
-      ['🚌 Bus',false],['🚗 Rental Car',false],['🚢 Ferry/Boat',false],
+      ['✈ Flights',true],['🚕 Taxi/Grab',true],['🛵 Gojek',false],['🚄 Train',false],
+      ['🚌 Bus',false],['🚗 Rental Car',false],['🚙 Self-drive',false],['🚢 Ferry/Boat',false],
       ['🚇 Metro/MRT',true],['🛵 Motorbike',false],['🚲 Bicycle',false]
     ].map(([t,a])=>`<button class="tag${a?' active':''}" onclick="togTag(this)">${t}</button>`).join('');
     label.textContent='';
@@ -2005,7 +2059,7 @@ function updateTransportTags(key){
   // Mark first 3 active by default, but always activate MRT/Metro if present
   container.innerHTML=transports.map((t,i)=>{
     const isMRT=/metro|mrt|subway|skytrain|lrt|ktx|thsr|mtr|tube|underground|ctrain|tram/i.test(t);
-    const isGrab=/grab|uber|lyft|didi|kakaotaxi|ola|careem/i.test(t);
+    const isGrab=/grab|uber|lyft|didi|kakaotaxi|ola|careem|gojek/i.test(t);
     const active=i<2||isMRT||isGrab;
     return `<button class="tag${active?' active':''}" onclick="togTag(this)">${t}</button>`;
   }).join('');
@@ -2340,8 +2394,11 @@ ITINERARY OPTIMISATION — follow these rules for every day:
    - Lunch: casual, convenient, fast — local hawker stalls, café, street food, quick noodle/rice meals near attractions.
    - Dinner: experience-focused — signature local cuisine, rooftop dining, famous restaurant, scenic or atmospheric spot. Higher quality than lunch.
 5. TRANSPORT WARNINGS: If a destination is a national park or protected area where private cars are NOT permitted (e.g. Zion, Bryce Canyon, Taroko, most national park interiors), specify "type":"transport" activity with instructions on the required shuttle bus, park bus, or cable car — do NOT recommend rental car access inside the park.
+6. ONE-WAY / ALTERNATING-TRAFFIC ROADS: If the access road to a destination is a narrow single-lane mountain route historically controlled by timed alternating one-way traffic (e.g. Fraser's Hill, Pahang — traffic alternates up/down on the hour), include a "type":"transport" activity noting this, and advise confirming the current schedule locally before departure since these schedules do change over time.
 
 IMPORTANT: Set the "currency" field to the official local currency of the PRIMARY destination (e.g. TWD for Taiwan, JPY for Japan, KRW for Korea, THB for Thailand, EUR for Europe, GBP for UK, AUD for Australia, CNY for China, SGD for Singapore, HKD for Hong Kong). NOT MYR, NOT CAD — use the destination's own currency.
+
+MUST-SEE ATTRACTIONS COVERAGE: Include EVERY major sightseeing attraction that appears in the "days" activities below (for days 1–${chunk1End}) as its own entry in "mustSeeAttractions" — do not cherry-pick just one or two per city. Every city being visited must be represented. Skip only minor stops like restaurants, transit points or shopping.
 
 CRITICAL: Return ONLY valid JSON. No markdown, no code fences, no text outside JSON.${needsChunks?`
 CHUNK INSTRUCTION: This trip is ${days} days. Generate ONLY days 1–${chunk1End} in the "days" array. Remaining days will be requested separately. Plan the full city/hotel allocation across all ${days} days so that later chunks stay consistent.`:''}
@@ -2349,7 +2406,7 @@ CHUNK INSTRUCTION: This trip is ${days} days. Generate ONLY days 1–${chunk1End
 {"tripName":"string","destinations":["string"],"summary":"2 sentence overview","totalBudgetEstimate":"MYR X–Y pp","flightTip":"1 sentence","currency":"[local currency of destination, e.g. TWD for Taiwan]","language":"[destination language]","timezone":"[destination timezone]","waypoints":["City1","City2"],
 "transportSummary":[{"from":"A","to":"B","mode":"✈ Flight","duration":"5h","cost":"MYR 800","tip":"Book ahead"}],
 "mustSeeAttractions":[
-  {"name":"string",${isChinese?'"nameZh":"中文","city":"string","cityZh":"城市"':'"city":"string"'},"emoji":"🏔","category":"Nature","dayNumber":1,"date":"${start}","description":"60-80 word vivid description: what makes this place special, what visitors will see and feel, the single best thing to do or experience here. Write in engaging present tense.","insiderTip":"One practical insider tip","estimatedCost":"Free","ticketPrice":"Free / MYR 25 / etc","ticketNote":"book online recommended","openingHours":"09:00–17:00 (closed Mon)","howToGet":"🚇 MRT to X station exit 2, 5 min walk","ticketUrl":"https://official-ticket-link-or-omit","duration":"2h","bestTime":"Morning","rating":"4.8/5","bookingUrl":"https://www.viator.com/search?q=${esc(destStr)}","googleMapsUrl":"https://www.google.com/maps/search/?api=1&query=place+${esc(destStr)}"}
+  {"name":"string",${isChinese?'"nameZh":"中文","city":"string","cityZh":"城市"':'"city":"string"'},"emoji":"🏔","category":"Nature","dayNumber":1,"date":"${start}","description":"100-140 word vivid description written as 4-6 full sentences: what makes this place special and its history or cultural significance, what visitors will see, hear and feel while there, a practical detail (best time to visit, photo spot, or how crowded it gets), and the single best thing to do or experience here. Never answer with just one short sentence. Write in engaging present tense.","insiderTip":"One practical insider tip","estimatedCost":"Free","ticketPrice":"Free / MYR 25 / etc","ticketNote":"book online recommended","openingHours":"09:00–17:00 (closed Mon)","howToGet":"🚇 MRT to X station exit 2, 5 min walk","ticketUrl":"https://official-ticket-link-or-omit","duration":"2h","bestTime":"Morning","rating":"4.8/5","bookingUrl":"https://www.viator.com/search?q=${esc(destStr)}","googleMapsUrl":"https://www.google.com/maps/search/?api=1&query=place+${esc(destStr)}"}
 ],
 "hotels":[
   {"name":"string",${isChinese?'"nameZh":"中文名",':''}"city":"string","stars":4,"pricePerNight":"MYR 350","emoji":"🏨","description":"One sentence.","address":"Full address",${isChinese?'"addressZh":"中文地址",':''}"bookingUrl":"https://www.booking.com/search.html?ss=${esc(destStr)}","agodaUrl":"https://www.agoda.com/search?city=${esc(destStr)}","tripadvisorUrl":"https://www.tripadvisor.com/Search?q=${esc(destStr)}"}
@@ -2394,21 +2451,21 @@ CHUNK INSTRUCTION: This trip is ${days} days. Generate ONLY days 1–${chunk1End
     throw new Error('No continuation days in response');
   }
 
-  // Parse continuation response → array of day objects
+  // Parse continuation response → {days:[...], mustSeeAttractions:[...]}
   function parseContinuationDays(raw){
     let c=raw.replace(/<think>[\s\S]*?<\/think>/gi,'').trim();
     c=c.replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
     if(c.startsWith('[')){
-      try{const p=JSON.parse(c);if(Array.isArray(p))return p;}catch(e){}
-      try{const p=JSON.parse(repairJSON(c));if(Array.isArray(p))return p;}catch(e){}
+      try{const p=JSON.parse(c);if(Array.isArray(p))return{days:p,mustSeeAttractions:[]};}catch(e){}
+      try{const p=JSON.parse(repairJSON(c));if(Array.isArray(p))return{days:p,mustSeeAttractions:[]};}catch(e){}
     }
     const js=c.indexOf('{'),je=c.lastIndexOf('}');
     if(js>=0&&je>=0){
       c=c.slice(js,je+1);
-      try{const p=JSON.parse(c);if(p.days)return p.days;}catch(e){}
-      try{const p=JSON.parse(repairJSON(c));if(p.days)return p.days;}catch(e){}
+      try{const p=JSON.parse(c);if(p.days)return{days:p.days,mustSeeAttractions:p.mustSeeAttractions||[]};}catch(e){}
+      try{const p=JSON.parse(repairJSON(c));if(p.days)return{days:p.days,mustSeeAttractions:p.mustSeeAttractions||[]};}catch(e){}
     }
-    return [];
+    return{days:[],mustSeeAttractions:[]};
   }
 
   try{
@@ -2455,14 +2512,17 @@ Continue logically from day ${from-1}. Keep same pace, style and hotel sequence.
 Group attractions geographically — no backtracking. No duplicate attractions from earlier days.
 Lunch = casual local food near attractions. Dinner = quality experience restaurant.
 Warn if entering national park areas where private cars are not permitted — specify shuttle/bus.
+Also include EVERY major sightseeing attraction from these days in "mustSeeAttractions" (not just one or two) — this feeds the trip's Highlights tab, so no attraction from days ${from}-${to} should be missing.
 
 CRITICAL: Return ONLY valid JSON — no markdown, no text outside JSON.
-{"days":[{"dayNumber":${from},"date":"${dateOfDay(from)}","title":"string","theme":"emoji Theme","city":"string","activities":[{"time":"09:00","name":"string",${isChinese?'"nameZh":"中文",':''}"description":"One sentence.","type":"attraction","emoji":"🏔","transport":"...","googleMapsUrl":"https://www.google.com/maps/search/?api=1&query=place","estimatedCost":"MYR 20","duration":"2h"}]}]}`;
+{"days":[{"dayNumber":${from},"date":"${dateOfDay(from)}","title":"string","theme":"emoji Theme","city":"string","activities":[{"time":"09:00","name":"string",${isChinese?'"nameZh":"中文",':''}"description":"One sentence.","type":"attraction","emoji":"🏔","transport":"...","googleMapsUrl":"https://www.google.com/maps/search/?api=1&query=place","estimatedCost":"MYR 20","duration":"2h"}]}],
+"mustSeeAttractions":[{"name":"string",${isChinese?'"nameZh":"中文","city":"string","cityZh":"城市"':'"city":"string"'},"emoji":"🏔","category":"Nature","dayNumber":${from},"date":"${dateOfDay(from)}","description":"100-140 word vivid description written as 4-6 full sentences: what makes this place special, what visitors will see and feel, a practical detail, and the single best thing to do here. Never one short sentence.","insiderTip":"One practical insider tip","estimatedCost":"Free","ticketPrice":"Free / MYR 25 / etc","openingHours":"09:00–17:00","howToGet":"🚇 directions","duration":"2h","bestTime":"Morning","rating":"4.8/5","bookingUrl":"https://www.viator.com/search?q=${esc(destStr)}","googleMapsUrl":"https://www.google.com/maps/search/?api=1&query=place"}]}`;
 
         const{text:ct}=await callWithFallback(contPrompt,validateContJSON);
-        const moreDays=parseContinuationDays(ct);
+        const{days:moreDays,mustSeeAttractions:moreHighlights}=parseContinuationDays(ct);
         if(moreDays.length){
           t.days=[...(t.days||[]),...moreDays];
+          if(moreHighlights?.length)t.mustSeeAttractions=[...(t.mustSeeAttractions||[]),...moreHighlights];
           prevCity=moreDays[moreDays.length-1]?.city||prevCity;
           // Advance from actual last day returned (not assumed chunk size)
           const lastReturned=Math.max(...moreDays.map(d=>d.dayNumber||0));
@@ -2537,9 +2597,17 @@ Return ONLY valid JSON — no markdown, no code fences, nothing outside JSON:
        China → eHailing: DiDi, maps: Google Maps + Amap (高德) + Baidu Maps, eWallet: Alipay + WeChat Pay, food: Meituan / Eleme
        Thailand → eHailing: Grab, maps: Google Maps, eWallet: TrueMoney / PromptPay / TNG Alipay+
        Singapore/Malaysia → eHailing: Grab, maps: Google Maps, eWallet: GrabPay / Touch n Go
+       Indonesia (Bali/Jakarta/Lombok/Yogyakarta) → eHailing: Gojek + Grab, maps: Google Maps, eWallet: GoPay / OVO / TNG Alipay+, food: GoFood
        Always add Google Translate to other.apps. Add Papago if Korea or Japan. Add Klook to other.apps for any Asian destination.
        Populate only relevant categories for the actual destination. Leave empty arrays for irrelevant categories. */
-    "essentialPhrases":[{"en":"Thank you","local":"Thank you / Merci","pronunciation":"mer-SEE (in Quebec)"}],
+    "essentialPhrases":[{"en":"Thank you","local":"Thank you / Merci","pronunciation":"mer-SEE (in Quebec)"}
+    /* Provide 8-10 essentialPhrases total (never fewer than 7), covering a practical
+       spread: greeting/hello, thank you, please, yes/no, excuse me/sorry, how much
+       is this?, where is the toilet/bathroom?, I don't understand, cheers/enjoy your
+       meal, and goodbye. Use the actual destination's local language(s). Skip this
+       array entirely (leave empty) only if the destination's primary language is
+       English. */
+    ],
     "customs":[{"title":"Tipping","detail":"15–20% in restaurants; 10–15% for taxis"}],
     "health":{"waterSafe":true,"tips":["Travel insurance strongly recommended","Health card not valid abroad — buy travel insurance"]},
     "emergency":[{"type":"Emergency","number":"911","note":"Police / Fire / Ambulance"}],
@@ -2588,12 +2656,40 @@ Return ONLY valid JSON — no markdown, no code fences, nothing outside JSON:
     tripData.highLevelBudget=gb.highLevelBudget;
     try{renderBudget(gb.highLevelBudget,tripData._meta);}catch(e){console.error('renderBudget:',e);}
   }
+  // Journey Map's food/budget/tips boxes are richer once the guide & budget land
+  try{buildJourneyMap(tripData);}catch(e){console.error('buildJourneyMap:',e);}
   updateTrip(tripData);
   toast('✓ Local Guide & Budget ready!');
 }
 
 // ══ RENDER ITINERARY ══
+// Known-correct official links for places the AI is prone to hallucinating a
+// wrong domain for (e.g. it guessed smokehouse.com.my instead of the real
+// thesmokehouse.my for Ye Olde Smokehouse, Fraser's Hill). Extend this list
+// whenever a wrong AI-generated link is spotted — applied at render time so
+// it also corrects trips that were already generated/saved.
+const KNOWN_OFFICIAL_LINKS={
+  'ye olde smokehouse':'https://thesmokehouse.my/ye-olde-smokehouse-frasers-hill/',
+};
+function _findOfficialLinkOverride(name){
+  const n=(name||'').toLowerCase();
+  for(const[k,url]of Object.entries(KNOWN_OFFICIAL_LINKS)){if(n.includes(k))return url;}
+  return null;
+}
+function _correctOfficialLinks(t){
+  (t.mustSeeAttractions||[]).forEach(a=>{
+    const url=_findOfficialLinkOverride(a.name);
+    if(url){a.ticketUrl=url;a.websiteUrl=url;}
+  });
+  (t.hotels||[]).forEach(h=>{
+    const url=_findOfficialLinkOverride(h.name);
+    if(url)h.websiteUrl=url;
+  });
+  return t;
+}
+
 function renderItinerary(t){
+  _correctOfficialLinks(t);
   const m=t._meta||{};
   const days=m.days||t.days?.length||'?';
   $('empty-itin').style.display='none';
@@ -2616,7 +2712,7 @@ function renderItinerary(t){
     ['Timezone',t.timezone||'—',''],
   ].map(([l,v,sub,id])=>`<div class="si"${id?` id="${id}"`:''}><div class="si-lbl">${l}</div><div class="si-val">${v}</div>${sub?`<div style="font-size:.65rem;color:var(--ink-ll);margin-top:.12rem;line-height:1.3">${sub}</div>`:''}</div>`).join('');
 
-  buildFlightTip(t);buildDays(t,days);buildMustSee(t);buildHotels(t);buildMap(t);
+  buildFlightTip(t);buildDays(t,days);buildMustSee(t);buildHotels(t);buildMap(t);buildJourneyMap(t);
 }
 
 function buildMustSee(t){
@@ -3376,11 +3472,20 @@ const SOCKET_DB={
 function getSocketInfo(destinations){
   const results=[];
   const seen=new Set();
+  const wordMatch=(key,k)=>new RegExp('(^|\\s)'+k.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'($|\\s)').test(key);
   for(const dest of destinations){
     const key=dest.toLowerCase().trim().split(',')[0].trim();
-    // Try exact match then partial
+    // Try exact match then whole-word partial match (word-boundary, not naive
+    // substring — naive substring falsely matched e.g. "usa" inside "nusajaya")
     let info=SOCKET_DB[key];
-    if(!info){for(const[k,v]of Object.entries(SOCKET_DB)){if(key.includes(k)||k.includes(key)){info=v;break;}}}
+    if(!info){for(const[k,v]of Object.entries(SOCKET_DB)){if(wordMatch(key,k)||wordMatch(k,key)){info=v;break;}}}
+    // Fallback: resolve the country via the shared destination-detection list —
+    // covers towns/districts not individually listed in SOCKET_DB (e.g. "Johor
+    // Bahru" or "Nusajaya" → Malaysia), which is why the guide sometimes went missing.
+    if(!info){
+      const ck=detectCountryFromName(dest);
+      if(ck)info=SOCKET_DB[ck];
+    }
     if(info&&!seen.has(info.t+info.v)){seen.add(info.t+info.v);results.push({dest,info});}
   }
   return results;
@@ -3743,6 +3848,19 @@ function buildMap(t){
   const groundWps=wps.filter(w=>groundCities.has(w));
   const mapWps=groundWps.length>=2?groundWps:wps;
 
+  // Country name to disambiguate bare waypoints for geocoding (e.g. "Nusajaya"
+  // alone can be mis-geocoded to the far more prominent "Nusa Dua, Bali"
+  // unless we qualify it with the trip's actual country).
+  const _routeAllDests=(t.destinations||[]).join(' ')+' '+((t._meta?.dests||[]).join(' '));
+  const _routeCountryName=CHINA_RE.test(_routeAllDests)?'China':countryNameFor(_routeAllDests);
+  const _disambig=w=>{
+    if(!w||!_routeCountryName)return w;
+    if(w.includes(','))return w; // already has its own qualifier
+    if(_routeCountryName!=='China'&&CHINA_RE.test(w))return w;
+    return w+', '+_routeCountryName;
+  };
+  const mapWpsQ=mapWps.map(_disambig);
+
   // ── Waypoints strip — ground segments only ─────────────────────────
   let wHtml='';
   mapWps.forEach((w,i)=>{
@@ -3764,19 +3882,18 @@ function buildMap(t){
     const _oldMapEl=document.getElementById('map-frame-leaflet');
     if(_oldMapEl)_oldMapEl.remove();
 
-    const _routeAllDests=(t.destinations||[]).join(' ')+' '+((t._meta?.dests||[]).join(' '));
-    const _routeIsCN=CHINA_RE.test(_routeAllDests);
-    const firstCity=mapWps[0]||'';
+    const _routeIsCN=_routeCountryName==='China';
+    const firstCity=mapWpsQ[0]||'';
 
     {
       // Google Maps embed — works globally including China
       let _gmSrc;
-      if(mapWps.length>=2){
-        const _gmO=encodeURIComponent(mapWps[0]);
-        const _gmD=mapWps.slice(1).map(encodeURIComponent).join('+to:');
+      if(mapWpsQ.length>=2){
+        const _gmO=encodeURIComponent(mapWpsQ[0]);
+        const _gmD=mapWpsQ.slice(1).map(encodeURIComponent).join('+to:');
         _gmSrc=`https://maps.google.com/maps?saddr=${_gmO}&daddr=${_gmD}&output=embed&hl=en&dirflg=d`;
       } else {
-        _gmSrc=`https://maps.google.com/maps?q=${encodeURIComponent(firstCity||wps[0]||'')}&output=embed&hl=en&z=12`;
+        _gmSrc=`https://maps.google.com/maps?q=${encodeURIComponent(firstCity||_disambig(wps[0])||'')}&output=embed&hl=en&z=12`;
       }
       const _gmWrap=document.createElement('div');
       _gmWrap.id='map-frame-leaflet';
@@ -3811,9 +3928,9 @@ function buildMap(t){
   }
 
   // ── Header links ───────────────────────────────────────────────────
-  const gDirUrl=mapWps.length>=2
-    ?`https://www.google.com/maps/dir/?api=1&origin=${esc(mapWps[0])}&destination=${esc(mapWps[mapWps.length-1])}&waypoints=${mapWps.slice(1,-1).map(esc).join('|')}&travelmode=driving`
-    :`https://www.google.com/maps/search/?api=1&query=${esc(wps[0])}`;
+  const gDirUrl=mapWpsQ.length>=2
+    ?`https://www.google.com/maps/dir/?api=1&origin=${esc(mapWpsQ[0])}&destination=${esc(mapWpsQ[mapWpsQ.length-1])}&waypoints=${mapWpsQ.slice(1,-1).map(esc).join('|')}&travelmode=driving`
+    :`https://www.google.com/maps/search/?api=1&query=${esc(_disambig(wps[0]))}`;
   $('map-hdr-links').innerHTML=`<a href="${gDirUrl}" target="_blank" class="btn btn-ghost btn-sm">🗺 Open Route ↗</a>`;
 
   // ── Transport legend (ground only) ────────────────────────────────
@@ -3850,7 +3967,7 @@ function buildMap(t){
   $('map-ftr').innerHTML=flightHtml+
     `<div style="margin-top:.6rem;display:flex;flex-wrap:wrap;gap:.3rem">
       <a href="${gDirUrl}" target="_blank" class="pill p-blue" style="padding:.22rem .65rem;font-size:.67rem">🗺 Full route in Google Maps ↗</a>
-      ${mapWps.map(w=>`<a href="https://www.google.com/maps/search/?api=1&query=${esc(w)}" target="_blank" class="pill p-amber" style="padding:.22rem .65rem;font-size:.67rem">📍 ${w} ↗</a>`).join('')}
+      ${mapWps.map((w,i)=>`<a href="https://www.google.com/maps/search/?api=1&query=${esc(mapWpsQ[i])}" target="_blank" class="pill p-amber" style="padding:.22rem .65rem;font-size:.67rem">📍 ${w} ↗</a>`).join('')}
     </div>`;
 
   // Activate Map tab
@@ -3893,110 +4010,242 @@ const TAIWAN_RE=/\b(taiwan|taipei|kaohsiung|taichung|tainan|hualien|keelung|taoy
 const HK_RE=/\b(hong kong|hongkong)\b/i;
 const MACAU_RE=/\b(macau|macao)\b/i;
 
+// ══ JOURNEY MAP — fun illustrated day-by-day overview ══
+function buildJourneyMap(t){
+  const wrap=$('journey-map-wrap');
+  if(!wrap)return;
+  const emptyJ=$('empty-journey'),contentJ=$('journey-content');
+  const days=[...(t.days||[])].sort((a,b)=>(a.dayNumber||0)-(b.dayNumber||0));
+  if(!days.length){
+    if(emptyJ)emptyJ.style.display='flex';
+    if(contentJ)contentJ.style.display='none';
+    $('badge-journey').style.display='none';
+    return;
+  }
+  if(emptyJ)emptyJ.style.display='none';
+  if(contentJ)contentJ.style.display='block';
+  $('badge-journey').style.display='inline';
+  if($('journey-trip-title'))$('journey-trip-title').textContent=t.tripName||'';
+
+  const m=t._meta||{};
+  const homeCity=(m.homeCity||'').trim();
+  const shortDate=ds=>{try{return new Date(ds+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short'});}catch(e){return ds||'';}};
+
+  // Leading emoji from a day's theme (AI always writes "🏔 Adventure" style),
+  // falling back to the first activity's emoji, then a generic pin.
+  const dayEmoji=day=>{
+    const themeEmoji=(day.theme||'').match(/^\p{Emoji}/u);
+    if(themeEmoji)return themeEmoji[0];
+    const act=(day.activities||[]).find(a=>a.emoji);
+    return act?.emoji||'📍';
+  };
+
+  // ── Must-try food: prefer the AI's curated list, else pull restaurant stops from the itinerary ──
+  let food=(t.localGuide?.bestLocalFood||[]).slice(0,6);
+  if(!food.length){
+    const seen=new Set();
+    days.forEach(d=>(d.activities||[]).forEach(a=>{
+      if(a.type!=='restaurant')return;
+      const name=cleanPlaceName(a.name);
+      if(name&&!seen.has(name)){seen.add(name);food.push(name);}
+    }));
+    food=food.slice(0,6);
+  }
+
+  // ── Budget: prefer the detailed breakdown once it lands, else the quick estimate from the main generation ──
+  let budgetText=t.totalBudgetEstimate||'';
+  if(t.highLevelBudget?.items?.length){
+    const cur=t.highLevelBudget.currency||'MYR';
+    const total=t.highLevelBudget.items.reduce((s,i)=>s+(i.mid||0),0);
+    if(total)budgetText=`${cur} ${total.toLocaleString()} pp (estimate)`;
+  }
+
+  // ── Travel tips: short, practical, whatever is available at render time ──
+  const tips=[t.flightTip,t.localGuide?.shoppingTips,t.localGuide?.customs?.[0]?.detail,t.localGuide?.closingNote]
+    .filter(Boolean).slice(0,4);
+
+  // ── Day nodes, wrapped into rows that alternate direction for a winding-path feel ──
+  const PER_ROW=Math.min(4,Math.max(2,Math.ceil(Math.sqrt(days.length*1.6))));
+  const rows=[];
+  for(let i=0;i<days.length;i+=PER_ROW)rows.push(days.slice(i,i+PER_ROW));
+
+  const nodeHtml=(day,idx)=>{
+    const wobble=idx%2===0?'-6px':'8px';
+    return `<div style="display:flex;flex-direction:column;align-items:center;min-width:108px;max-width:130px;transform:translateY(${wobble})">
+      <div style="width:54px;height:54px;border-radius:50%;background:linear-gradient(145deg,#C9A96E,#B08D4F);display:flex;align-items:center;justify-content:center;box-shadow:0 3px 8px rgba(0,0,0,.18);border:3px solid #fff;font-size:1.5rem">${dayEmoji(day)}</div>
+      <div style="margin-top:.35rem;font-family:'Playfair Display',serif;font-weight:700;font-size:.8rem;color:#2C1F08">Day ${day.dayNumber??idx+1}</div>
+      <div style="font-size:.62rem;color:#8a7a5c">${shortDate(day.date)}</div>
+      <div style="font-size:.66rem;color:#5a4d38;text-align:center;margin-top:.15rem;line-height:1.3">${(day.title||day.city||'').slice(0,40)}</div>
+    </div>`;
+  };
+  const connector=`<div style="flex:0 0 auto;font-size:1.1rem;color:#C9A96E;align-self:center;margin:0 .1rem">┈┈▶</div>`;
+  const rowsHtml=rows.map((row,ri)=>{
+    const reversed=ri%2===1;
+    const nodes=row.map((d,i)=>{
+      const globalIdx=ri*PER_ROW+i;
+      return nodeHtml(d,globalIdx)+(i<row.length-1?connector:'');
+    });
+    if(reversed)nodes.reverse();
+    const dropConnector=ri<rows.length-1?`<div style="display:flex;justify-content:${reversed?'flex-start':'flex-end'};padding:0 30px;font-size:1.1rem;color:#C9A96E">┊<br>▼</div>`:'';
+    return `<div style="display:flex;${reversed?'flex-direction:row-reverse;':''}align-items:flex-start;flex-wrap:wrap;gap:.2rem;justify-content:center">${nodes.join('')}</div>${dropConnector}`;
+  }).join('');
+
+  const infoBox=(icon,title,items,accent)=>{
+    if(!items||!items.length)return'';
+    const body=Array.isArray(items)
+      ?`<ul style="margin:.3rem 0 0 1rem;padding:0;font-size:.72rem;color:#4a4030;line-height:1.65">${items.map(x=>`<li>${x}</li>`).join('')}</ul>`
+      :`<div style="font-size:.72rem;color:#4a4030;line-height:1.6;margin-top:.3rem">${items}</div>`;
+    return `<div style="background:#fff;border-radius:10px;padding:.75rem .9rem;border-left:4px solid ${accent};box-shadow:0 2px 6px rgba(0,0,0,.06);flex:1;min-width:200px">
+      <div style="font-family:'Playfair Display',serif;font-weight:700;font-size:.82rem;color:#2C1F08">${icon} ${title}</div>
+      ${body}
+    </div>`;
+  };
+
+  const compassRose=`<svg width="72" height="72" viewBox="0 0 72 72" style="position:absolute;top:14px;right:16px">
+    <circle cx="36" cy="36" r="32" fill="#fff" stroke="#C9A96E" stroke-width="1.5" opacity=".9"/>
+    <path d="M36 8 L42 36 L36 30 L30 36 Z" fill="#C0392B"/>
+    <path d="M36 64 L30 36 L36 42 L42 36 Z" fill="#8a7a5c"/>
+    <text x="36" y="19" font-size="10" font-weight="700" text-anchor="middle" fill="#C0392B" font-family="sans-serif">N</text>
+    <text x="36" y="60" font-size="8" text-anchor="middle" fill="#8a7a5c" font-family="sans-serif">S</text>
+    <text x="12" y="39" font-size="8" text-anchor="middle" fill="#8a7a5c" font-family="sans-serif">W</text>
+    <text x="60" y="39" font-size="8" text-anchor="middle" fill="#8a7a5c" font-family="sans-serif">E</text>
+  </svg>`;
+
+  const destStr=(t.destinations||[]).join(', ');
+  wrap.innerHTML=`
+  <div style="position:relative;background:linear-gradient(135deg,#FFF8ED 0%,#F3F8F1 55%,#FDF1F5 100%);border:1px solid #EADFC8;border-radius:16px;padding:1.6rem 1.4rem 1.3rem;overflow:hidden;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+    ${compassRose}
+    <div style="text-align:center;margin-bottom:.3rem">
+      <div style="font-family:'Playfair Display',serif;font-weight:700;font-size:1.5rem;color:#2C1F08">🧭 ${t.tripName||'Your Trip'}</div>
+      <div style="font-size:.76rem;color:#8a7a5c;margin-top:.15rem">${destStr} · ${days.length} day${days.length>1?'s':''}${homeCity?' · from '+homeCity:''}</div>
+    </div>
+    ${homeCity?`<div style="text-align:center;font-size:.85rem;margin-bottom:.4rem">✈ Depart ${homeCity}</div>`:''}
+    <div style="margin:.6rem 0 1rem">${rowsHtml}</div>
+    ${homeCity?`<div style="text-align:center;font-size:.85rem;margin-bottom:1rem">✈ Return to ${homeCity}</div>`:''}
+    <div style="display:flex;flex-wrap:wrap;gap:.7rem">
+      ${infoBox('🍜','Must-Try Food',food,'#1A6B6B')}
+      ${infoBox('💡','Travel Tips',tips,'#C67B3D')}
+      ${budgetText?`<div style="background:#2C1F08;border-radius:10px;padding:.75rem .9rem;flex:1;min-width:200px;display:flex;align-items:center;justify-content:center;gap:.5rem">
+        <span style="font-size:1.3rem">💰</span>
+        <div><div style="font-size:.62rem;color:#D9C79A;text-transform:uppercase;letter-spacing:.05em">Estimated Budget</div><div style="font-family:'Playfair Display',serif;font-weight:700;font-size:.95rem;color:#F0C87A">${budgetText}</div></div>
+      </div>`:''}
+    </div>
+    <div style="text-align:center;font-size:.6rem;color:#a89a7f;margin-top:1rem">Made with Travel Planning Pro · compass indicates North ▲</div>
+  </div>`;
+}
+
 function buildCityMaps(t){
   const container=$('city-maps-section');
   if(!container)return;
   const allDests=(t.destinations||[]).join(' ')+' '+((t._meta?.dests||[]).join(' '));
+  const homeCityRaw=(t._meta?.homeCity||'').trim();
 
-  // Build per-city data — normalise city keys to lowercase base name for fuzzy matching
-  const cityData={};
   // Helper: normalise "Seoul, South Korea" → "seoul"
   const normCity=s=>(s||'').split(',')[0].trim().toLowerCase();
-  // Find the cityData key that best matches a raw city string
-  function findCityKey(rawCity){
+
+  // City (normalised) → hotel, for looking up the hotel tied to any day's city
+  const hotelByCity={};
+  (t.hotels||[]).forEach(h=>{
+    const city=(h.city||'').trim();
+    if(!city)return;
+    hotelByCity[normCity(city)]=h;
+  });
+  function findHotelForCity(rawCity){
     const n=normCity(rawCity);
     if(!n)return null;
-    // Exact normalised match
-    if(cityData[n])return n;
-    // Partial match both ways
-    for(const k of Object.keys(cityData)){
-      if(k.includes(n)||n.includes(k))return k;
+    if(hotelByCity[n])return hotelByCity[n];
+    for(const k of Object.keys(hotelByCity)){
+      if(k.includes(n)||n.includes(k))return hotelByCity[k];
     }
     return null;
   }
-
-  (t.hotels||[]).forEach((h,idx)=>{
-    const city=(h.city||'').trim();
-    if(!city)return;
-    const key=normCity(city);
-    if(!cityData[key])cityData[key]={hotel:null,hotelIdx:-1,places:[],displayCity:city};
-    cityData[key].hotel=h;cityData[key].hotelIdx=idx;
-  });
-
-  (t.mustSeeAttractions||[]).forEach(a=>{
-    const key=findCityKey(a.city||'');
-    if(!key)return;
-    const name=cleanPlaceName(a.name);
-    if(name&&!cityData[key].places.find(p=>p.name===name))
-      cityData[key].places.push({name,type:'attraction'});
-  });
-
-  (t.days||[]).forEach(day=>{
-    const key=findCityKey(day.city||'');
-    if(!key)return;
-    (day.activities||[]).forEach(act=>{
-      if(!['attraction','restaurant','shopping','experience'].includes(act.type))return;
-      const name=cleanPlaceName(act.name);
-      if(name&&!cityData[key].places.find(p=>p.name===name))
-        cityData[key].places.push({name,type:act.type||'attraction'});
-    });
-  });
+  // Country-qualified label for any city string, reusing the same Greater-China
+  // special-casing used elsewhere plus the general country-name fallback.
+  function countryFor(cityStr){
+    const _ctx=(cityStr||'')+' '+allDests;
+    if(CHINA_RE.test(_ctx))return'China';
+    if(TAIWAN_RE.test(_ctx))return'Taiwan';
+    if(HK_RE.test(_ctx))return'Hong Kong';
+    if(MACAU_RE.test(_ctx))return'Macao';
+    return countryNameFor(_ctx);
+  }
+  function qualify(name,cityStr){
+    const c=countryFor(cityStr);
+    return `${name}${c?', '+c:''}`;
+  }
+  const homeCountry=homeCityRaw?countryNameFor(homeCityRaw):'';
+  const homeQ=homeCityRaw?(homeCountry?`${homeCityRaw}, ${homeCountry}`:homeCityRaw):'';
 
   const typeIcon={attraction:'📍',restaurant:'🍽',shopping:'🛍',experience:'🎯'};
+  const days=[...(t.days||[])].sort((a,b)=>(a.dayNumber||0)-(b.dayNumber||0));
 
-  // Show city map card for every city that has a hotel (places optional — just hotel pin if none)
-  const cardData=Object.entries(cityData).filter(([,d])=>d.hotel);
-
-  const cards=cardData.map(([,d])=>{
-      const h=d.hotel;
-      const city=d.displayCity||h.city||'';
+  const cards=days.map((day,i)=>{
+      const city=(day.city||'').trim();
+      const h=findHotelForCity(city);
       const _ctx=city+' '+allDests;
       const isCN=CHINA_RE.test(_ctx);
       const isTW=TAIWAN_RE.test(_ctx);
-      const isHK=HK_RE.test(_ctx);
-      const isMO=MACAU_RE.test(_ctx);
-      const country=isCN?', China':isTW?', Taiwan':isHK?', Hong Kong':isMO?', Macao':'';
-      const places=d.places.slice(0,4);
-      const hotelQ=`${h.name}, ${city}${country}`;
-
-      // ── Next hotel (for progressive routing: current city → next city's hotel) ──
-      const nextHotel=(t.hotels||[])[d.hotelIdx+1]||null;
-      const nextHotelQ=nextHotel?`${nextHotel.name}, ${nextHotel.city}`:'';
-      // Route endpoint: next hotel if moving on, else loop back to same hotel
-      const routeEnd=nextHotel?nextHotelQ:hotelQ;
-      const routeEndLabel=nextHotel?`→ ${nextHotel.city} Hotel`:'→ Hotel';
-
-      // ── External open-in-Google-Maps link ────────────────────────────
-      const wps=places.map(p=>esc(p.name+', '+city+country));
-      const googleDirUrl=places.length
-        ?`https://www.google.com/maps/dir/?api=1&origin=${esc(hotelQ)}&destination=${esc(routeEnd)}&waypoints=${wps.join('|')}&travelmode=driving`
-        :nextHotel
-          ?`https://www.google.com/maps/dir/?api=1&origin=${esc(hotelQ)}&destination=${esc(routeEnd)}&travelmode=driving`
-          :`https://www.google.com/maps/search/?api=1&query=${esc(hotelQ)}`;
-      const amapUrl=`https://www.amap.com/dir?origin[name]=${encodeURIComponent(h.name)}&destination[name]=${encodeURIComponent((places[0]?.name||city)+', '+city)}&type=walk&src=travel-pro`;
-
-      const mapCardId='city-map-'+d.hotelIdx;
-      const leafletId='city-lf-'+d.hotelIdx;
       const isKorea=/korea|korean|seoul|busan|jeju|incheon|daegu|daejeon|gwangju/i.test(_ctx);
+      const cityQ=city?qualify(city,city):'';
+      const hotelQ=h?qualify(h.name,city):cityQ;
+      const hotelLabel=h?h.name:(city||'destination');
+
+      const prevCity=(days[i-1]?.city||'').trim();
+      const nextCity=(days[i+1]?.city||'').trim();
+      const isFirstDay=i===0;
+      const isLastDay=i===days.length-1;
+
+      // ── Origin: home city (day 1, if known), previous city's hotel (transfer
+      // day arriving here today), or today's own hotel (staying put) ──
+      let originQ, originLabel;
+      if(isFirstDay&&homeQ){originQ=homeQ;originLabel=homeCityRaw;}
+      else if(!isFirstDay&&prevCity&&normCity(prevCity)!==normCity(city)){
+        const prevHotel=findHotelForCity(prevCity);
+        originQ=prevHotel?qualify(prevHotel.name,prevCity):qualify(prevCity,prevCity);
+        originLabel=prevHotel?prevHotel.name:prevCity;
+      } else {originQ=hotelQ;originLabel=hotelLabel;}
+
+      // ── Destination: home city (last day, if known), next city's hotel
+      // (transfer day departing today), or today's own hotel (staying put) ──
+      let destQ, destLabel;
+      if(isLastDay&&homeQ){destQ=homeQ;destLabel=homeCityRaw;}
+      else if(!isLastDay&&nextCity&&normCity(nextCity)!==normCity(city)){
+        const nextHotel=findHotelForCity(nextCity);
+        destQ=nextHotel?qualify(nextHotel.name,nextCity):qualify(nextCity,nextCity);
+        destLabel=nextHotel?nextHotel.name:nextCity;
+      } else {destQ=hotelQ;destLabel=hotelLabel;}
+
+      // ── This day's attractions, in order, deduped ──
+      const places=[];
+      (day.activities||[]).forEach(act=>{
+        if(!['attraction','restaurant','shopping','experience'].includes(act.type))return;
+        const name=cleanPlaceName(act.name);
+        if(name&&!places.find(p=>p.name===name))places.push({name,type:act.type||'attraction'});
+      });
+      const stopsForUrl=places.slice(0,6).map(p=>esc(qualify(p.name,city)));
+
+      const googleDirUrl=stopsForUrl.length
+        ?`https://www.google.com/maps/dir/?api=1&origin=${esc(originQ)}&destination=${esc(destQ)}&waypoints=${stopsForUrl.join('|')}&travelmode=driving`
+        :`https://www.google.com/maps/dir/?api=1&origin=${esc(originQ)}&destination=${esc(destQ)}&travelmode=driving`;
+
+      const mapCardId='day-map-'+(day.dayNumber??i+1);
 
       // Pre-compute map embed HTML to avoid nested template literal issues
-      // Build Google Maps route: hotel → attraction1 → attraction2 → ... → hotel
       let _cityMapHtml;
-      if(isCN&&places.length){
-        // China — Google Maps embed (primary) + optional Amap/Baidu links below
-        const _gmO=encodeURIComponent(hotelQ);
-        const _gmStops=places.map(p=>encodeURIComponent(p.name+', '+city+', China'));
-        const _gmD=_gmStops.join('+to:')+'+to:'+encodeURIComponent(routeEnd);
-        const _hotelCN=encodeURIComponent((h.nameZh||h.name)+(h.addressZh||h.address?', '+(h.addressZh||h.address):''));
-        const _cnPlaceLinks=places.map(p=>{
-          const _pCN=encodeURIComponent((p.nameZh||p.name)+', '+city);
-          const _pLabel=(p.nameZh||p.name);
-          return '<a href="https://www.amap.com/dir?from[name]='+_hotelCN+'&to[name]='+_pCN+'&type=driving&src=travel-pro" target="_blank" style="display:inline-flex;align-items:center;gap:.28rem;padding:.3rem .65rem;background:#1677ff;color:#fff;border-radius:6px;font-size:.72rem;font-weight:600;text-decoration:none;white-space:nowrap">→ '+(_pLabel.length>18?_pLabel.slice(0,17)+'…':_pLabel)+' ↗</a>';
+      if(isCN){
+        const _gmO=encodeURIComponent(originQ);
+        const _gmD=stopsForUrl.length
+          ?stopsForUrl.join('+to:')+'+to:'+encodeURIComponent(destQ)
+          :encodeURIComponent(destQ);
+        const _hotelCN=encodeURIComponent(((h?.nameZh||h?.name||originLabel))+(h?.addressZh||h?.address?', '+(h.addressZh||h.address):''));
+        const _cnPlaceLinks=places.slice(0,6).map(p=>{
+          const _pCN=encodeURIComponent(p.name+', '+city);
+          return '<a href="https://www.amap.com/dir?from[name]='+_hotelCN+'&to[name]='+_pCN+'&type=driving&src=travel-pro" target="_blank" style="display:inline-flex;align-items:center;gap:.28rem;padding:.3rem .65rem;background:#1677ff;color:#fff;border-radius:6px;font-size:.72rem;font-weight:600;text-decoration:none;white-space:nowrap">→ '+(p.name.length>18?p.name.slice(0,17)+'…':p.name)+' ↗</a>';
         }).join('');
-        const _cnHotelSearch='https://www.amap.com/search?query='+encodeURIComponent((h.nameZh||h.name)+' '+city);
-        const _cnBaidu='https://map.baidu.com/search/'+encodeURIComponent((h.nameZh||h.name)+' '+city);
+        const _cnHotelSearch='https://www.amap.com/search?query='+encodeURIComponent((h?.nameZh||h?.name||originLabel)+' '+city);
+        const _cnBaidu='https://map.baidu.com/search/'+encodeURIComponent((h?.nameZh||h?.name||originLabel)+' '+city);
         _cityMapHtml='<iframe src="https://maps.google.com/maps?saddr='+_gmO+'&daddr='+_gmD+'&output=embed&hl=en&dirflg=d"'
-          +' style="height:300px;width:100%;border:0;display:block"'
+          +' style="height:280px;width:100%;border:0;display:block"'
           +' loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>'
           +'<div style="padding:.55rem 1rem;background:var(--sand);border-top:1px solid var(--border)">'
           +'<details style="cursor:pointer"><summary style="font-size:.7rem;font-weight:600;color:var(--ink-l);list-style:none;display:flex;align-items:center;gap:.35rem"><span>🗺 Also navigate with Amap (高德地图) or Baidu Maps</span></summary>'
@@ -4004,37 +4253,13 @@ function buildCityMaps(t){
           +'<a href="'+_cnHotelSearch+'" target="_blank" style="padding:.28rem .6rem;background:#1677ff;color:#fff;border-radius:6px;font-size:.7rem;font-weight:600;text-decoration:none">🏨 Hotel · Amap ↗</a>'
           +'<a href="'+_cnBaidu+'" target="_blank" style="padding:.28rem .6rem;background:#2663d1;color:#fff;border-radius:6px;font-size:.7rem;font-weight:600;text-decoration:none">🗺 百度地图 ↗</a>'
           +_cnPlaceLinks+'</div></details></div>';
-      } else if(isCN){
-        // China, no attractions — just centre on the hotel
-        const _cnHotelSearch='https://www.amap.com/search?query='+encodeURIComponent((h.nameZh||h.name)+' '+city);
-        const _cnBaidu='https://map.baidu.com/search/'+encodeURIComponent((h.nameZh||h.name)+' '+city);
-        _cityMapHtml='<iframe src="https://maps.google.com/maps?q='+encodeURIComponent(hotelQ+', China')+'&output=embed&hl=en&z=14"'
-          +' style="height:300px;width:100%;border:0;display:block"'
-          +' loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>'
-          +'<div style="padding:.55rem 1rem;background:var(--sand);border-top:1px solid var(--border)">'
-          +'<details style="cursor:pointer"><summary style="font-size:.7rem;font-weight:600;color:var(--ink-l);list-style:none;display:flex;gap:.35rem"><span>🗺 Also navigate with Amap (高德地图) or Baidu Maps</span></summary>'
-          +'<div style="margin-top:.45rem;display:flex;gap:.38rem;flex-wrap:wrap">'
-          +'<a href="'+_cnHotelSearch+'" target="_blank" style="padding:.28rem .6rem;background:#1677ff;color:#fff;border-radius:6px;font-size:.7rem;font-weight:600;text-decoration:none">🏨 Hotel · Amap ↗</a>'
-          +'<a href="'+_cnBaidu+'" target="_blank" style="padding:.28rem .6rem;background:#2663d1;color:#fff;border-radius:6px;font-size:.7rem;font-weight:600;text-decoration:none">🗺 百度地图 ↗</a>'
-          +'</div></details></div>';
-      } else if(places.length){
-        // Route: hotel → attractions → next hotel (if moving on) or back to same hotel (last city)
-        const _gmO=encodeURIComponent(hotelQ);
-        const _gmStops=places.map(p=>encodeURIComponent(p.name+', '+city+country));
-        const _gmD=_gmStops.join('+to:')+'+to:'+encodeURIComponent(routeEnd);
-        _cityMapHtml='<iframe src="https://maps.google.com/maps?saddr='+_gmO+'&daddr='+_gmD+'&output=embed&hl=en&dirflg=d"'
-          +' style="height:300px;width:100%;border:0;display:block"'
-          +' loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>';
-      } else if(nextHotel){
-        // No attractions but moving to next city — show direct route hotel → next hotel
-        const _gmO=encodeURIComponent(hotelQ);
-        _cityMapHtml='<iframe src="https://maps.google.com/maps?saddr='+_gmO+'&daddr='+encodeURIComponent(routeEnd)+'&output=embed&hl=en&dirflg=d"'
-          +' style="height:300px;width:100%;border:0;display:block"'
-          +' loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>';
       } else {
-        // Last city, no attractions — just centre on the hotel
-        _cityMapHtml='<iframe src="https://maps.google.com/maps?q='+encodeURIComponent(hotelQ)+'&output=embed&hl=en&z=15"'
-          +' style="height:300px;width:100%;border:0;display:block"'
+        const _gmO=encodeURIComponent(originQ);
+        const _gmD=stopsForUrl.length
+          ?stopsForUrl.join('+to:')+'+to:'+encodeURIComponent(destQ)
+          :encodeURIComponent(destQ);
+        _cityMapHtml='<iframe src="https://maps.google.com/maps?saddr='+_gmO+'&daddr='+_gmD+'&output=embed&hl=en&dirflg=d"'
+          +' style="height:280px;width:100%;border:0;display:block"'
           +' loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>';
       }
 
@@ -4047,39 +4272,36 @@ function buildCityMaps(t){
           +'💡 카카오맵 is the go-to map in Korea. Also try <a href="https://map.naver.com/v5/search/'+encodeURIComponent(city)+'" target="_blank" style="color:#03C75A;font-weight:600">네이버지도 ↗</a> for public transit. T-money card works everywhere.</div>')
         :'';
 
-      // One primary map button per destination
       const _mapBtn=isKorea
         ?'<a href="https://map.kakao.com/?q='+encodeURIComponent(hotelQ)+'" target="_blank" class="btn btn-ghost btn-sm" style="color:#f9b800;background:#1a0f00;border-color:#5D3A1A">🗺 카카오맵 ↗</a>'
         :'<a href="'+googleDirUrl+'" target="_blank" class="btn btn-ghost btn-sm">🗺 Google Maps ↗</a>';
 
+      const dateLabel=day.date?fmtD(day.date):'';
+
       return `
       <div class="map-card" id="${mapCardId}">
         <div class="map-hdr">
-          <div class="map-hdr-title">📍 ${city}</div>
+          <div class="map-hdr-title">📅 Day ${day.dayNumber??i+1}${dateLabel?' · '+dateLabel:''} — ${day.title||city||''}</div>
           <div style="display:flex;gap:.3rem;align-items:center;flex-wrap:wrap">
             ${_mapBtn}
           </div>
         </div>
         <div class="wpts-row" style="flex-wrap:wrap">
-          <div class="wpt" style="background:var(--gold-ll);border:1px solid var(--gold);font-weight:600">🏨 ${h.name}</div>
+          <div class="wpt" style="background:var(--gold-ll);border:1px solid var(--gold);font-weight:600">🏨 ${originLabel}</div>
           ${places.map(p=>`<div class="wpt-seg">→</div><div class="wpt">${typeIcon[p.type]||'📍'} ${p.name}</div>`).join('')}
-          ${nextHotel
-            ?`<div class="wpt-seg">→</div><div class="wpt" style="background:#EAF4F0;border:1px solid var(--teal);font-size:.73rem">🏨 ${nextHotel.city} Hotel</div>`
-            :places.length?`<div class="wpt-seg">→</div><div class="wpt" style="color:var(--ink-ll);font-size:.73rem">🏨 return</div>`:''}
+          <div class="wpt-seg">→</div><div class="wpt" style="background:#EAF4F0;border:1px solid var(--teal);font-size:.73rem">🏨 ${destLabel}</div>
         </div>
         ${_cityMapHtml}
         ${_tipHtml}
       </div>`;
     });
 
-  container.innerHTML=cardData.length
+  container.innerHTML=cards.length
     ?`<div class="sec-hdr" style="margin-top:1.2rem">
-        <div class="sec-title">🏙 City Maps</div>
-        <div class="muted" style="font-size:.72rem">Route: hotel → attractions → next city's hotel (or return if last stop). Tap the map button for turn-by-turn directions.</div>
+        <div class="sec-title">📅 Daily Route Maps</div>
+        <div class="muted" style="font-size:.72rem">One map per day — start point → attractions → end point (same hotel, next city's hotel, or home on arrival/departure day). Tap the map button for turn-by-turn directions with live time &amp; distance.</div>
       </div>`+cards.join('')
     :'';
-
-  // All cities use Google Maps embeds; China cards additionally show optional Amap/Baidu links
 }
 
 function changeHotel(idx){
@@ -4133,6 +4355,7 @@ function buildHotels(t){
       <div class="h-stars">${'★'.repeat(Math.min(h.stars||3,5))}${'☆'.repeat(Math.max(0,5-(h.stars||3)))}</div>
       <div class="h-meta">${h.city||''} · ${h.pricePerNight||''}<br>${h.description||''}${h.address?`<br><span style="font-size:.62rem">📍 ${h.address}</span>`:''}${h.addressZh?`<br><span style="font-size:.62rem;color:var(--ink-ll)">📍 ${h.addressZh}</span>`:''}</div>
       <div class="h-links">
+        ${h.websiteUrl?`<a href="${h.websiteUrl}" target="_blank" class="pill p-teal">🌐 Official Site</a>`:''}
         ${h.bookingUrl?`<a href="${h.bookingUrl}" target="_blank" class="pill p-purple">🛏 Booking</a>`:''}
         ${h.agodaUrl?`<a href="${h.agodaUrl}" target="_blank" class="pill p-amber">🏨 Agoda</a>`:''}
         ${h.tripadvisorUrl?`<a href="${h.tripadvisorUrl}" target="_blank" class="pill p-teal">⭐ Reviews</a>`:''}
@@ -4947,7 +5170,7 @@ async function _doLoadByCode(code,pw,errEl,btn,onSuccess){
     tripData=t;
     renderItinerary(t);renderGuide(t.localGuide);renderBudget(t.highLevelBudget,t._meta);
     if(!t.localGuide)setTimeout(()=>generateGuideAndBudget(t).catch(()=>{}),400);
-    if(t.packingList)buildPacking(t.packingList);else generatePackingList(t).catch(()=>{});
+    if(t.packingList)buildPacking(t.packingList,t._socketInfos||getSocketInfo(t.destinations||t._meta?.dests||[]));else generatePackingList(t).catch(()=>{});
     generateWeather(t).catch(()=>{});
     toast('✅ Trip loaded from shared code!');
     if(onSuccess)onSuccess();
@@ -5026,7 +5249,7 @@ async function loadFromURL(){
     const t=JSON.parse(json);
     tripData=t;renderItinerary(t);renderGuide(t.localGuide);renderBudget(t.highLevelBudget,t._meta);
     if(!t.localGuide)setTimeout(()=>generateGuideAndBudget(t).catch(()=>{}),400);
-    if(t.packingList)buildPacking(t.packingList);else generatePackingList(t).catch(()=>{});
+    if(t.packingList)buildPacking(t.packingList,t._socketInfos||getSocketInfo(t.destinations||t._meta?.dests||[]));else generatePackingList(t).catch(()=>{});
     generateWeather(t).catch(()=>{});
     toast('✓ Loaded from shared link!');goTab('itin');return true;
   }catch(e){toast('Could not load trip from link');return false;}
@@ -5130,7 +5353,7 @@ function loadSaved(key){
         $('empty-pack').style.display='none';
         $('pack-content').style.display='block';
         $('badge-pack').style.display='inline';
-        try{buildPacking(t.packingList,[]);}catch(e){}
+        try{buildPacking(t.packingList,t._socketInfos||getSocketInfo(t.destinations||t._meta?.dests||[]));}catch(e){}
       }
       try{restoreForm(t._meta,t.tripName);}catch(e){}
       generateWeather(t).catch(()=>{});
@@ -5138,7 +5361,7 @@ function loadSaved(key){
       // Fully structured trip — use normal render path
       renderItinerary(t);renderGuide(t.localGuide);renderBudget(t.highLevelBudget,t._meta);
       if(!t.localGuide)setTimeout(()=>generateGuideAndBudget(t).catch(()=>{}),400);
-      if(t.packingList)buildPacking(t.packingList);else generatePackingList(t).catch(()=>{});
+      if(t.packingList)buildPacking(t.packingList,t._socketInfos||getSocketInfo(t.destinations||t._meta?.dests||[]));else generatePackingList(t).catch(()=>{});
       generateWeather(t).catch(()=>{});
     }
     toast('✓ Trip loaded');goTab('itin');
@@ -5362,23 +5585,25 @@ function _exportStyles(){
     .budget-table td{padding:.35rem .6rem;border-bottom:1px solid #f0ebe0;font-size:.82rem}
     .no-print,.pdf-btn,.word-btn{display:none!important}
     img{max-width:100%;border-radius:6px}
+    *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}
     @media print{@page{margin:1.5cm}body{padding:0}}
   `;
 }
 
 function printTab(tabId){
   if(!tripData){toast('Generate a trip first');return;}
-  const titles={itin:'Itinerary',guide:'Local Guide',budget:'Budget'};
-  const contentId={itin:'itin-content',guide:'guide-content',budget:'budget-content'};
+  const titles={itin:'Itinerary',guide:'Local Guide',budget:'Budget',highlights:'Highlights',hotels:'Hotels',journey:'Journey Map'};
+  const contentId={itin:'itin-content',guide:'guide-content',budget:'budget-content',highlights:'highlights-content',hotels:'hotels-content',journey:'journey-content'};
   const el=$(contentId[tabId]);
   if(!el){toast('No content to export');return;}
   const w=window.open('','_blank','width=900,height=700');
+  if(!w){toast('⚠ Popup blocked — allow popups for this site to export PDF',5000);return;}
   w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
   <title>${tripData.tripName||'Trip'} – ${titles[tabId]||''}</title>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet">
   <style>${_exportStyles()}</style></head><body>
-  <h1>${tripData.tripName||'Trip'}</h1>
-  <div style="font-size:.78rem;color:#7A6F62;margin-bottom:1.2rem">${titles[tabId]} · Printed ${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}</div>
+  ${tabId==='journey'?'':`<h1>${tripData.tripName||'Trip'}</h1>
+  <div style="font-size:.78rem;color:#7A6F62;margin-bottom:1.2rem">${titles[tabId]} · Printed ${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}</div>`}
   ${el.innerHTML}
   <script>setTimeout(()=>{window.print();window.close();},600);<\/script>
   </body></html>`);
@@ -5387,8 +5612,8 @@ function printTab(tabId){
 
 function exportWord(tabId){
   if(!tripData){toast('Generate a trip first');return;}
-  const titles={itin:'Itinerary',guide:'Local Guide',budget:'Budget'};
-  const contentId={itin:'itin-content',guide:'guide-content',budget:'budget-content'};
+  const titles={itin:'Itinerary',guide:'Local Guide',budget:'Budget',highlights:'Highlights',hotels:'Hotels',journey:'Journey Map'};
+  const contentId={itin:'itin-content',guide:'guide-content',budget:'budget-content',highlights:'highlights-content',hotels:'hotels-content',journey:'journey-content'};
   const el=$(contentId[tabId]);
   if(!el){toast('No content to export');return;}
   const dateStr=new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
@@ -6910,7 +7135,7 @@ function loadDemo(){
     $('empty-pack').style.display='none';
     $('pack-content').style.display='block';
     $('badge-pack').style.display='inline';
-    buildPacking(tripData.packingList,[]);
+    buildPacking(tripData.packingList,tripData._socketInfos||getSocketInfo(tripData.destinations||tripData._meta?.dests||[]));
   }catch(e){}
 
   // Strip theme/city from demo day headers — keep only date & weather badge
@@ -7578,7 +7803,7 @@ async function applyAIModification(){
     const _addDaysMod=(base,n)=>{const d=new Date(base);d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);};
     const dateOfMod=n=>_addDaysMod(meta.start,n-1);
     const daySchema=`{"dayNumber":1,"date":"YYYY-MM-DD","title":"string","theme":"emoji Theme","city":"string","activities":[{"time":"09:00","name":"string","description":"string","type":"attraction","emoji":"🏔","transport":"string","googleMapsUrl":"https://www.google.com/maps/search/?api=1&query=place","bookingUrl":"","websiteUrl":"","estimatedCost":"MYR 20","duration":"2h"}]}`;
-    const headerSchema=`{"tripName":"string","destinations":["string"],"summary":"2 sentences","totalBudgetEstimate":"MYR X–Y pp","flightTip":"string","currency":"[local currency]","language":"string","timezone":"string","waypoints":["string"],"transportSummary":[{"from":"A","to":"B","mode":"string","duration":"string","cost":"string","tip":"string"}],"mustSeeAttractions":[{"name":"string","city":"string","emoji":"🏔","category":"string","description":"string","estimatedCost":"string","duration":"2h","googleMapsUrl":"https://www.google.com/maps/search/?api=1&query=place"}],"hotels":[{"name":"string","city":"string","stars":4,"pricePerNight":"MYR 350","emoji":"🏨","description":"string","bookingUrl":"https://www.booking.com/search.html?ss=${encodeURIComponent(destStr)}","agodaUrl":"https://www.agoda.com/search?city=${encodeURIComponent(destStr)}"}],"days":[${daySchema}]}`;
+    const headerSchema=`{"tripName":"string","destinations":["string"],"summary":"2 sentences","totalBudgetEstimate":"MYR X–Y pp","flightTip":"string","currency":"[local currency]","language":"string","timezone":"string","waypoints":["string"],"transportSummary":[{"from":"A","to":"B","mode":"string","duration":"string","cost":"string","tip":"string"}],"mustSeeAttractions":[{"name":"string","city":"string","emoji":"🏔","category":"string","dayNumber":1,"description":"100-140 word vivid description in 4-6 full sentences — never a single short sentence","estimatedCost":"string","duration":"2h","googleMapsUrl":"https://www.google.com/maps/search/?api=1&query=place"}],"hotels":[{"name":"string","city":"string","stars":4,"pricePerNight":"MYR 350","emoji":"🏨","description":"string","bookingUrl":"https://www.booking.com/search.html?ss=${encodeURIComponent(destStr)}","agodaUrl":"https://www.agoda.com/search?city=${encodeURIComponent(destStr)}"}],"days":[${daySchema}]}`;
 
     const chunk1End=needsChunks?CHUNK:totalDays;
     const modPrompt=`You are a world-class travel planner modifying an existing ${totalDays}-day trip.
@@ -7594,7 +7819,8 @@ ${dayCtx}
 INSTRUCTIONS:
 - Apply ONLY the requested modification. Keep everything else as-is.
 - Renumber dayNumber sequentially 1–${totalDays}. Recalculate dates from ${meta.start}.
-- Update hotels/transportSummary/waypoints only if the modification requires it.${needsChunks?`
+- Update hotels/transportSummary/waypoints only if the modification requires it.
+- Include EVERY major sightseeing attraction from days 1–${chunk1End} in "mustSeeAttractions" (not just one or two per city) — this feeds the Highlights tab.${needsChunks?`
 CHUNK INSTRUCTION: This is a ${totalDays}-day trip. Generate ONLY days 1–${chunk1End} in "days". Remaining days will be requested separately.`:''}
 CRITICAL: Return ONLY valid JSON — no markdown, no code fences.
 ${headerSchema}`;
@@ -7631,8 +7857,10 @@ Modification applied: "${instruction}"
 Hotels: ${JSON.stringify(ctxObj.hotels)}
 Previous day ended in: ${prevCity}
 Generate ONLY days ${from} through ${to}. Day ${from} date = ${dateOfMod(from)}, Day ${to} date = ${dateOfMod(to)}.
+Also include EVERY major sightseeing attraction from these days in "mustSeeAttractions" (not just one or two) — this feeds the Highlights tab.
 CRITICAL: Return ONLY valid JSON — no markdown.
-{"days":[{"dayNumber":${from},"date":"${dateOfMod(from)}","title":"string","theme":"emoji Theme","city":"string","activities":[{"time":"09:00","name":"string","description":"string","type":"attraction","emoji":"🏔","transport":"string","googleMapsUrl":"https://www.google.com/maps/search/?api=1&query=place","estimatedCost":"MYR 20","duration":"2h"}]}]}`;
+{"days":[{"dayNumber":${from},"date":"${dateOfMod(from)}","title":"string","theme":"emoji Theme","city":"string","activities":[{"time":"09:00","name":"string","description":"string","type":"attraction","emoji":"🏔","transport":"string","googleMapsUrl":"https://www.google.com/maps/search/?api=1&query=place","estimatedCost":"MYR 20","duration":"2h"}]}],
+"mustSeeAttractions":[{"name":"string","city":"string","emoji":"🏔","category":"string","dayNumber":${from},"description":"100-140 word vivid description in 4-6 full sentences — never a single short sentence","estimatedCost":"string","duration":"2h","googleMapsUrl":"https://www.google.com/maps/search/?api=1&query=place"}]}`;
         const ct=await silentCallAI(contPrompt);
         let cont;
         try{
@@ -7643,6 +7871,7 @@ CRITICAL: Return ONLY valid JSON — no markdown.
         }catch(e){cont=null;}
         if(cont?.days?.length){
           modified.days=[...modified.days,...cont.days];
+          if(cont.mustSeeAttractions?.length)modified.mustSeeAttractions=[...(modified.mustSeeAttractions||[]),...cont.mustSeeAttractions];
           prevCity=cont.days[cont.days.length-1]?.city||prevCity;
         }
       }
