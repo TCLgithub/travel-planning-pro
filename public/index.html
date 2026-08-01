@@ -3143,19 +3143,47 @@ async function geocodeCity(city){
 
 async function fetchWeather(lat,lon,startDate,endDate){
   const today=new Date();
-  const maxForecast=new Date(today);maxForecast.setDate(today.getDate()+16);
+  // Open-Meteo's free forecast window is 16 days INCLUDING today, so the last
+  // valid day is today+15 — requesting today+16 gets a hard 400 from their API.
+  const maxForecast=new Date(today);maxForecast.setDate(today.getDate()+15);
   const sd=new Date(startDate),ed=new Date(endDate);
+
+  const tryLiveForecast=async(qs,qe)=>{
+    try{
+      const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}`+
+        `&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_mean,weathercode`+
+        `&timezone=auto&start_date=${qs}&end_date=${qe}`;
+      const r=await fetch(url);
+      const d=await r.json();
+      // Days right at the edge of the forecast window sometimes come back 200 OK
+      // but with null values — treat that the same as "not available" and fall
+      // back to the historical average rather than showing blank/NaN weather.
+      const usable=!d.error&&d.daily?.time?.length&&(d.daily.temperature_2m_max||[]).some(v=>v!=null);
+      return usable?{...d,_type:'forecast'}:null;
+    }catch(e){return null;}
+  };
+
+  const mergeDaily=(fc,hist)=>{
+    if(!fc)return hist;
+    if(!hist)return fc;
+    const keys=['time','temperature_2m_max','temperature_2m_min','precipitation_probability_mean','weathercode'];
+    const daily={};
+    keys.forEach(k=>{daily[k]=[...(fc.daily[k]||[]),...(hist.daily[k]||[])];});
+    return{daily,_type:'mixed'};
+  };
+
   if(sd<=maxForecast){
-    // Live forecast (up to 16 days ahead)
     const qs=sd.toISOString().slice(0,10);
-    const qe=ed>maxForecast?maxForecast.toISOString().slice(0,10):ed.toISOString().slice(0,10);
-    const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}`+
-      `&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_mean,weathercode`+
-      `&timezone=auto&start_date=${qs}&end_date=${qe}`;
-    const r=await fetch(url);
-    return{...(await r.json()),_type:'forecast'};
+    const qe=(ed>maxForecast?maxForecast:ed).toISOString().slice(0,10);
+    const fc=await tryLiveForecast(qs,qe);
+    if(ed<=maxForecast)return fc||fetchHistoricalAvg(lat,lon,startDate,endDate);
+    if(!fc)return fetchHistoricalAvg(lat,lon,startDate,endDate);
+    // Stay spans the forecast boundary — live for the near days, historical average for the rest
+    const nextDay=new Date(maxForecast);nextDay.setDate(nextDay.getDate()+1);
+    const hist=await fetchHistoricalAvg(lat,lon,nextDay.toISOString().slice(0,10),endDate);
+    return mergeDaily(fc,hist);
   }
-  // Beyond forecast — fetch historical averages from past 3 years for same date range
+  // Entirely beyond the forecast window — average of the past 3 years for the same dates
   return fetchHistoricalAvg(lat,lon,startDate,endDate);
 }
 
@@ -3248,7 +3276,7 @@ async function generateWeather(t){
         card.querySelector('.wx-loading').outerHTML=`<div class="wx-typical" style="padding:.65rem .9rem;font-size:.73rem;color:var(--ink-ll)">📆 No data available for ${mo}. Check back closer to your trip.</div>`;
         continue;
       }
-      const isHist=wx._type==='historical';
+      const isHist=wx._type==='historical'||wx._type==='mixed';
       const {time,temperature_2m_max:hi,temperature_2m_min:lo,precipitation_probability_mean:rainArr,weathercode:code}=wx.daily;
       // Historical data uses precipitation_sum not precipitation_probability_mean
       const rain=rainArr||wx.daily.precipitation_sum?.map(v=>v!=null?Math.min(Math.round((v||0)*15),95):0)||time.map(()=>0);
@@ -3263,7 +3291,9 @@ async function generateWeather(t){
           <div class="wx-d-rain">💧${Math.round(rain[i]||0)}%</div>
         </div>`;
       }).join('');
-      const histNote=isHist?`<div style="padding:.35rem .9rem .5rem;font-size:.63rem;color:var(--ink-ll);border-top:1px solid var(--border);background:var(--sand)">📊 Historical averages (3-yr) — live forecast available within 16 days of travel</div>`:'';
+      const histNote=wx._type==='mixed'
+        ?`<div style="padding:.35rem .9rem .5rem;font-size:.63rem;color:var(--ink-ll);border-top:1px solid var(--border);background:var(--sand)">📊 Later days show a 3-yr historical average — live forecast only reaches 16 days out</div>`
+        :isHist?`<div style="padding:.35rem .9rem .5rem;font-size:.63rem;color:var(--ink-ll);border-top:1px solid var(--border);background:var(--sand)">📊 Historical averages (3-yr) — live forecast available within 16 days of travel</div>`:'';
       card.innerHTML=`<div class="wx-city-hdr"><div class="wx-city-name">📍 ${c.city}${isHist?' <span style="font-size:.6rem;background:var(--gold-ll);color:var(--ink-l);padding:.05rem .3rem;border-radius:4px;margin-left:.3rem">avg</span>':''}</div><div class="wx-city-dates">${fmtD(c.start)}${c.end!==c.start?' → '+fmtD(c.end):''}</div></div>
         <div class="wx-days-row">${daysHtml}</div>${histNote}`;
       // Inject weather badge into matching day headers in itinerary
@@ -4064,45 +4094,85 @@ function buildJourneyMap(t){
   const tips=[t.flightTip,t.localGuide?.shoppingTips,t.localGuide?.customs?.[0]?.detail,t.localGuide?.closingNote]
     .filter(Boolean).slice(0,4);
 
-  // ── Day nodes, wrapped into rows that alternate direction for a winding-path feel ──
+  // ── Scrapbook palette — cycles through 4 soft washes so consecutive days
+  // never repeat the same colour, echoing the hand-drawn reference style ──
+  const PALETTE=[
+    {wash:'rgba(255,178,120,.4)',accent:'#D97B3F',ribbon:'#E8825A'},   // peach
+    {wash:'rgba(140,205,175,.4)',accent:'#2E8B6F',ribbon:'#3FA083'},   // mint
+    {wash:'rgba(140,180,230,.4)',accent:'#3E7CB8',ribbon:'#5490C9'},   // sky
+    {wash:'rgba(235,150,190,.4)',accent:'#C6577F',ribbon:'#D6708E'},   // blush
+  ];
+
+  // Small hand-drawn-feeling wavy connector between two consecutive day stickers
+  const waveConnector=(reversed,color)=>`<svg width="42" height="26" viewBox="0 0 42 26" style="flex:0 0 auto;align-self:center;${reversed?'transform:scaleX(-1)':''}">
+    <path d="M1 13 Q 10 3, 20 13 T 38 13" stroke="${color}" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-dasharray="1,6.5"/>
+    <path d="M33 7 L39 13 L33 19" stroke="${color}" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+  // Curved "turn" connector where the path wraps to the next row
+  const turnConnector=(flip)=>`<svg width="46" height="34" viewBox="0 0 46 34" style="display:block;margin:0 auto;${flip?'transform:scaleX(-1)':''}">
+    <path d="M4 2 C 4 20, 42 14, 42 32" stroke="#C9A96E" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-dasharray="1,6.5"/>
+    <path d="M36 27 L42 32 L47 26" stroke="#C9A96E" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+
+  const dayCard=(day,idx)=>{
+    const pal=PALETTE[idx%PALETTE.length];
+    const rot=idx%2===0?-3:2.5;
+    const lift=idx%2===0?'-4px':'6px';
+    const title=(day.title||day.city||'').slice(0,34);
+    return `<div style="position:relative;flex:0 0 auto;width:118px;display:flex;flex-direction:column;align-items:center;transform:translateY(${lift})">
+      <div style="position:absolute;top:6px;width:78px;height:78px;border-radius:50%;background:radial-gradient(circle,${pal.wash} 0%,rgba(255,255,255,0) 72%);pointer-events:none"></div>
+      <div style="position:relative;background:#fff;border-radius:12px;padding:.55rem .5rem .45rem;width:100%;box-shadow:0 4px 10px rgba(60,40,10,.14);transform:rotate(${rot}deg);border:1px solid rgba(0,0,0,.04)">
+        <div style="position:absolute;top:-9px;left:50%;transform:translateX(-50%) rotate(${-rot}deg);background:${pal.ribbon};color:#fff;font-size:.6rem;font-weight:700;padding:.1rem .5rem;border-radius:20px;box-shadow:0 2px 4px rgba(0,0,0,.15);white-space:nowrap">DAY ${day.dayNumber??idx+1}</div>
+        <div style="text-align:center;font-size:1.7rem;margin-top:.5rem;line-height:1.1">${dayEmoji(day)}</div>
+        <div style="text-align:center;font-size:.6rem;color:${pal.accent};font-weight:700;margin-top:.1rem">${shortDate(day.date)}</div>
+        <div style="text-align:center;font-size:.64rem;color:#5a4d38;margin-top:.15rem;line-height:1.3;min-height:2.4em">${title}</div>
+      </div>
+    </div>`;
+  };
+
+  // ── Rows of day-cards, snaking left/right/left for a winding-trail feel ──
   const PER_ROW=Math.min(4,Math.max(2,Math.ceil(Math.sqrt(days.length*1.6))));
   const rows=[];
   for(let i=0;i<days.length;i+=PER_ROW)rows.push(days.slice(i,i+PER_ROW));
-
-  const nodeHtml=(day,idx)=>{
-    const wobble=idx%2===0?'-6px':'8px';
-    return `<div style="display:flex;flex-direction:column;align-items:center;min-width:108px;max-width:130px;transform:translateY(${wobble})">
-      <div style="width:54px;height:54px;border-radius:50%;background:linear-gradient(145deg,#C9A96E,#B08D4F);display:flex;align-items:center;justify-content:center;box-shadow:0 3px 8px rgba(0,0,0,.18);border:3px solid #fff;font-size:1.5rem">${dayEmoji(day)}</div>
-      <div style="margin-top:.35rem;font-family:'Playfair Display',serif;font-weight:700;font-size:.8rem;color:#2C1F08">Day ${day.dayNumber??idx+1}</div>
-      <div style="font-size:.62rem;color:#8a7a5c">${shortDate(day.date)}</div>
-      <div style="font-size:.66rem;color:#5a4d38;text-align:center;margin-top:.15rem;line-height:1.3">${(day.title||day.city||'').slice(0,40)}</div>
-    </div>`;
-  };
-  const connector=`<div style="flex:0 0 auto;font-size:1.1rem;color:#C9A96E;align-self:center;margin:0 .1rem">┈┈▶</div>`;
   const rowsHtml=rows.map((row,ri)=>{
     const reversed=ri%2===1;
-    const nodes=row.map((d,i)=>{
+    const pieces=row.map((d,i)=>{
       const globalIdx=ri*PER_ROW+i;
-      return nodeHtml(d,globalIdx)+(i<row.length-1?connector:'');
+      const conn=i<row.length-1?waveConnector(reversed,PALETTE[globalIdx%PALETTE.length].accent):'';
+      return dayCard(d,globalIdx)+conn;
     });
-    if(reversed)nodes.reverse();
-    const dropConnector=ri<rows.length-1?`<div style="display:flex;justify-content:${reversed?'flex-start':'flex-end'};padding:0 30px;font-size:1.1rem;color:#C9A96E">┊<br>▼</div>`:'';
-    return `<div style="display:flex;${reversed?'flex-direction:row-reverse;':''}align-items:flex-start;flex-wrap:wrap;gap:.2rem;justify-content:center">${nodes.join('')}</div>${dropConnector}`;
+    if(reversed)pieces.reverse();
+    const turn=ri<rows.length-1?turnConnector(!reversed):'';
+    return `<div style="display:flex;${reversed?'flex-direction:row-reverse;':''}align-items:flex-start;flex-wrap:wrap;gap:.15rem;justify-content:center">${pieces.join('')}</div>${turn}`;
   }).join('');
 
-  const infoBox=(icon,title,items,accent)=>{
-    if(!items||!items.length)return'';
-    const body=Array.isArray(items)
-      ?`<ul style="margin:.3rem 0 0 1rem;padding:0;font-size:.72rem;color:#4a4030;line-height:1.65">${items.map(x=>`<li>${x}</li>`).join('')}</ul>`
-      :`<div style="font-size:.72rem;color:#4a4030;line-height:1.6;margin-top:.3rem">${items}</div>`;
-    return `<div style="background:#fff;border-radius:10px;padding:.75rem .9rem;border-left:4px solid ${accent};box-shadow:0 2px 6px rgba(0,0,0,.06);flex:1;min-width:200px">
-      <div style="font-family:'Playfair Display',serif;font-weight:700;font-size:.82rem;color:#2C1F08">${icon} ${title}</div>
-      ${body}
-    </div>`;
-  };
+  const flightRow=label=>`<div style="display:flex;align-items:center;justify-content:center;gap:.5rem;margin:.3rem 0">
+    <span style="flex:1;max-width:70px;height:0;border-top:2px dashed #C9A96E"></span>
+    <span style="background:#2C1F08;color:#F0C87A;padding:.28rem .85rem;border-radius:20px;font-size:.72rem;font-weight:600;white-space:nowrap;box-shadow:0 2px 5px rgba(0,0,0,.15)">${label}</span>
+    <span style="flex:1;max-width:70px;height:0;border-top:2px dashed #C9A96E"></span>
+  </div>`;
 
-  const compassRose=`<svg width="72" height="72" viewBox="0 0 72 72" style="position:absolute;top:14px;right:16px">
-    <circle cx="36" cy="36" r="32" fill="#fff" stroke="#C9A96E" stroke-width="1.5" opacity=".9"/>
+  const foodBox=food.length?`<div style="background:#fffdf8;border-radius:4px;padding:.8rem .95rem;border:2px dashed #D9A05B;transform:rotate(-1deg);box-shadow:0 3px 8px rgba(60,40,10,.08);flex:1;min-width:190px">
+    <div style="font-family:'Playfair Display',serif;font-weight:700;font-size:.82rem;color:#2C1F08;letter-spacing:.02em">🍜 Must-Try Food</div>
+    <div style="margin:.4rem 0 0;font-size:.71rem;color:#4a4030;line-height:1.75">${food.map(x=>`🥢 ${x}`).join('<br>')}</div>
+  </div>`:'';
+
+  const tipsBox=tips.length?`<div style="background:#FFF6D6;border-radius:4px;padding:.8rem .95rem .8rem 1.05rem;transform:rotate(1.3deg);box-shadow:0 3px 8px rgba(60,40,10,.1);position:relative;flex:1;min-width:190px">
+    <div style="position:absolute;top:-8px;left:16px;font-size:1rem">📌</div>
+    <div style="font-family:'Playfair Display',serif;font-weight:700;font-size:.82rem;color:#2C1F08">💡 Trip Notes</div>
+    <ul style="margin:.35rem 0 0 1rem;padding:0;font-size:.71rem;color:#4a4030;line-height:1.65">${tips.map(x=>`<li>${x}</li>`).join('')}</ul>
+  </div>`:'';
+
+  const budgetBox=budgetText?`<div style="flex:1;min-width:150px;display:flex;align-items:center;justify-content:center">
+    <div style="width:128px;height:128px;border-radius:50%;border:3px dashed #C9A96E;background:#2C1F08;display:flex;flex-direction:column;align-items:center;justify-content:center;transform:rotate(-6deg);box-shadow:0 4px 10px rgba(0,0,0,.2)">
+      <span style="font-size:1.3rem">💰</span>
+      <div style="font-size:.56rem;color:#D9C79A;text-transform:uppercase;letter-spacing:.06em;margin-top:.15rem">Est. Budget</div>
+      <div style="font-family:'Playfair Display',serif;font-weight:700;font-size:.8rem;color:#F0C87A;text-align:center;padding:0 .3rem;line-height:1.25">${budgetText}</div>
+    </div>
+  </div>`:'';
+
+  const compassRose=`<svg width="66" height="66" viewBox="0 0 72 72" style="position:absolute;top:14px;right:16px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.15))">
+    <circle cx="36" cy="36" r="32" fill="#fffdf8" stroke="#C9A96E" stroke-width="1.5"/>
     <path d="M36 8 L42 36 L36 30 L30 36 Z" fill="#C0392B"/>
     <path d="M36 64 L30 36 L36 42 L42 36 Z" fill="#8a7a5c"/>
     <text x="36" y="19" font-size="10" font-weight="700" text-anchor="middle" fill="#C0392B" font-family="sans-serif">N</text>
@@ -4111,26 +4181,29 @@ function buildJourneyMap(t){
     <text x="60" y="39" font-size="8" text-anchor="middle" fill="#8a7a5c" font-family="sans-serif">E</text>
   </svg>`;
 
+  // Faint scattered doodles for scrapbook texture — decorative only, kept low-opacity so they never fight for attention
+  const doodles=`<span style="position:absolute;top:10px;left:14px;font-size:1.6rem;opacity:.14;transform:rotate(-12deg)">🌿</span>
+    <span style="position:absolute;bottom:14px;left:22px;font-size:1.4rem;opacity:.14;transform:rotate(8deg)">📷</span>
+    <span style="position:absolute;bottom:70px;right:26px;font-size:1.3rem;opacity:.13;transform:rotate(-6deg)">🎈</span>`;
+
   const destStr=(t.destinations||[]).join(', ');
   wrap.innerHTML=`
-  <div style="position:relative;background:linear-gradient(135deg,#FFF8ED 0%,#F3F8F1 55%,#FDF1F5 100%);border:1px solid #EADFC8;border-radius:16px;padding:1.6rem 1.4rem 1.3rem;overflow:hidden;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+  <div style="position:relative;background:linear-gradient(135deg,#FFF8ED 0%,#F3F8F1 55%,#FDF1F5 100%);border:1px solid #EADFC8;border-radius:18px;padding:1.7rem 1.5rem 1.4rem;overflow:hidden;-webkit-print-color-adjust:exact;print-color-adjust:exact;box-shadow:inset 0 0 0 6px #fff, inset 0 0 0 7px #EADFC8">
+    ${doodles}
     ${compassRose}
-    <div style="text-align:center;margin-bottom:.3rem">
-      <div style="font-family:'Playfair Display',serif;font-weight:700;font-size:1.5rem;color:#2C1F08">🧭 ${t.tripName||'Your Trip'}</div>
-      <div style="font-size:.76rem;color:#8a7a5c;margin-top:.15rem">${destStr} · ${days.length} day${days.length>1?'s':''}${homeCity?' · from '+homeCity:''}</div>
+    <div style="text-align:center;margin-bottom:.2rem">
+      <div style="font-family:'Playfair Display',serif;font-weight:700;font-size:1.55rem;color:#2C1F08">✨ ${t.tripName||'Your Trip'} ✨</div>
+      <div style="font-size:.76rem;color:#8a7a5c;margin-top:.2rem">📍 ${destStr} · ${days.length} day${days.length>1?'s':''}${homeCity?' · from '+homeCity:''}</div>
     </div>
-    ${homeCity?`<div style="text-align:center;font-size:.85rem;margin-bottom:.4rem">✈ Depart ${homeCity}</div>`:''}
-    <div style="margin:.6rem 0 1rem">${rowsHtml}</div>
-    ${homeCity?`<div style="text-align:center;font-size:.85rem;margin-bottom:1rem">✈ Return to ${homeCity}</div>`:''}
-    <div style="display:flex;flex-wrap:wrap;gap:.7rem">
-      ${infoBox('🍜','Must-Try Food',food,'#1A6B6B')}
-      ${infoBox('💡','Travel Tips',tips,'#C67B3D')}
-      ${budgetText?`<div style="background:#2C1F08;border-radius:10px;padding:.75rem .9rem;flex:1;min-width:200px;display:flex;align-items:center;justify-content:center;gap:.5rem">
-        <span style="font-size:1.3rem">💰</span>
-        <div><div style="font-size:.62rem;color:#D9C79A;text-transform:uppercase;letter-spacing:.05em">Estimated Budget</div><div style="font-family:'Playfair Display',serif;font-weight:700;font-size:.95rem;color:#F0C87A">${budgetText}</div></div>
-      </div>`:''}
+    ${homeCity?flightRow('✈ Depart '+homeCity):''}
+    <div style="margin:.7rem 0 1.1rem">${rowsHtml}</div>
+    ${homeCity?flightRow('✈ Return to '+homeCity):''}
+    <div style="display:flex;flex-wrap:wrap;gap:.85rem;margin-top:.5rem;align-items:stretch">
+      ${foodBox}
+      ${tipsBox}
+      ${budgetBox}
     </div>
-    <div style="text-align:center;font-size:.6rem;color:#a89a7f;margin-top:1rem">Made with Travel Planning Pro · compass indicates North ▲</div>
+    <div style="text-align:center;font-size:.6rem;color:#a89a7f;margin-top:1.1rem">Made with Travel Planning Pro · compass indicates North ▲</div>
   </div>`;
 }
 
