@@ -2365,7 +2365,7 @@ async function generateAll(){
   $('empty-itin-retry').style.display='none';
   startLoad();
 
-  const CHUNK=8; // days per API call — keeps output safely under token limits
+  const CHUNK=5; // days per API call — kept small since each day now also carries full mustSeeAttractions detail, which was overflowing max_tokens at 8
   const needsChunks=days>CHUNK;
   const chunk1End=needsChunks?CHUNK:days;
 
@@ -2516,7 +2516,7 @@ Also include EVERY major sightseeing attraction from these days in "mustSeeAttra
 
 CRITICAL: Return ONLY valid JSON — no markdown, no text outside JSON.
 {"days":[{"dayNumber":${from},"date":"${dateOfDay(from)}","title":"string","theme":"emoji Theme","city":"string","activities":[{"time":"09:00","name":"string",${isChinese?'"nameZh":"中文",':''}"description":"One sentence.","type":"attraction","emoji":"🏔","transport":"...","googleMapsUrl":"https://www.google.com/maps/search/?api=1&query=place","estimatedCost":"MYR 20","duration":"2h"}]}],
-"mustSeeAttractions":[{"name":"string",${isChinese?'"nameZh":"中文","city":"string","cityZh":"城市"':'"city":"string"'},"emoji":"🏔","category":"Nature","dayNumber":${from},"date":"${dateOfDay(from)}","description":"100-140 word vivid description written as 4-6 full sentences: what makes this place special, what visitors will see and feel, a practical detail, and the single best thing to do here. Never one short sentence.","insiderTip":"One practical insider tip","estimatedCost":"Free","ticketPrice":"Free / MYR 25 / etc","openingHours":"09:00–17:00","howToGet":"🚇 directions","duration":"2h","bestTime":"Morning","rating":"4.8/5","bookingUrl":"https://www.viator.com/search?q=${esc(destStr)}","googleMapsUrl":"https://www.google.com/maps/search/?api=1&query=place"}]}`;
+"mustSeeAttractions":[{"name":"string",${isChinese?'"nameZh":"中文","city":"string","cityZh":"城市"':'"city":"string"'},"emoji":"🏔","category":"Nature","dayNumber":${from},"date":"${dateOfDay(from)}","description":"50-80 word description in 2-3 full sentences: what makes this place special and the single best thing to do here. Never one short sentence — keep it brief but not a one-liner.","insiderTip":"One practical insider tip","estimatedCost":"Free","ticketPrice":"Free / MYR 25 / etc","duration":"2h","googleMapsUrl":"https://www.google.com/maps/search/?api=1&query=place"}]}`;
 
         const{text:ct}=await callWithFallback(contPrompt,validateContJSON);
         const{days:moreDays,mustSeeAttractions:moreHighlights}=parseContinuationDays(ct);
@@ -7935,8 +7935,8 @@ async function applyAIModification(){
       if(el) dayCtx=el.innerText.replace(/\s{2,}/g,' ').trim();
     }
 
-    // ── Chunked modification (same CHUNK=8 as initial generation) ──
-    const CHUNK=8;
+    // ── Chunked modification (same CHUNK as initial generation) ──
+    const CHUNK=5;
     const needsChunks=totalDays>CHUNK;
     const _addDaysMod=(base,n)=>{const d=new Date(base);d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);};
     const dateOfMod=n=>_addDaysMod(meta.start,n-1);
@@ -7987,7 +7987,13 @@ ${headerSchema}`;
       const actualModChunk1End=modified.days.length
         ?Math.max(...modified.days.map(d=>d.dayNumber||0))
         :chunk1End;
-      for(let from=actualModChunk1End+1;from<=totalDays;from+=CHUNK){
+      // while-loop advancing by ACTUAL last day returned (not a fixed +=CHUNK
+      // step) — a fixed step silently skipped and permanently lost any days
+      // a truncated response failed to include, which is how a modified trip
+      // could end up with fewer total days than requested.
+      let from=actualModChunk1End+1;
+      let stall=0;
+      while(from<=totalDays&&stall<6){
         const to=Math.min(from+CHUNK-1,totalDays);
         statusEl.textContent=`⏳ Fetching days ${from}–${to}…`;
         const contPrompt=`Continue the modified ${totalDays}-day trip "${tripData.tripName}".
@@ -7998,7 +8004,7 @@ Generate ONLY days ${from} through ${to}. Day ${from} date = ${dateOfMod(from)},
 Also include EVERY major sightseeing attraction from these days in "mustSeeAttractions" (not just one or two) — this feeds the Highlights tab.
 CRITICAL: Return ONLY valid JSON — no markdown.
 {"days":[{"dayNumber":${from},"date":"${dateOfMod(from)}","title":"string","theme":"emoji Theme","city":"string","activities":[{"time":"09:00","name":"string","description":"string","type":"attraction","emoji":"🏔","transport":"string","googleMapsUrl":"https://www.google.com/maps/search/?api=1&query=place","estimatedCost":"MYR 20","duration":"2h"}]}],
-"mustSeeAttractions":[{"name":"string","city":"string","emoji":"🏔","category":"string","dayNumber":${from},"description":"100-140 word vivid description in 4-6 full sentences — never a single short sentence","estimatedCost":"string","duration":"2h","googleMapsUrl":"https://www.google.com/maps/search/?api=1&query=place"}]}`;
+"mustSeeAttractions":[{"name":"string","city":"string","emoji":"🏔","category":"string","dayNumber":${from},"description":"50-80 word description in 2-3 full sentences — never a single short sentence","estimatedCost":"string","duration":"2h","googleMapsUrl":"https://www.google.com/maps/search/?api=1&query=place"}]}`;
         const ct=await silentCallAI(contPrompt);
         let cont;
         try{
@@ -8011,6 +8017,12 @@ CRITICAL: Return ONLY valid JSON — no markdown.
           modified.days=[...modified.days,...cont.days];
           if(cont.mustSeeAttractions?.length)modified.mustSeeAttractions=[...(modified.mustSeeAttractions||[]),...cont.mustSeeAttractions];
           prevCity=cont.days[cont.days.length-1]?.city||prevCity;
+          const lastReturned=Math.max(...cont.days.map(d=>d.dayNumber||0));
+          from=lastReturned>=from?lastReturned+1:from+CHUNK; // guard against a bad/duplicate dayNumber stalling the loop
+          stall=0;
+        }else{
+          from+=CHUNK; // nothing usable came back — skip ahead rather than retry forever
+          stall++;
         }
       }
     }
