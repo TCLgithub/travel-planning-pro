@@ -1149,6 +1149,9 @@ const DB = {
   singapore:  [{e:'🌿',n:'Gardens by the Bay',d:'Supertrees and cloud forest — book Flower Dome ahead'},{e:'🎡',n:'Marina Bay Sands SkyPark',d:'Observation deck 200m up — infinity pool for guests'},{e:'🦁',n:'Singapore Zoo',d:'World-ranked open zoo — plus Night Safari'},{e:'🌶',n:'Little India & Chinatown',d:'Heritage enclaves with street food and temples'},{e:'🏝',n:'Sentosa / Universal Studios',d:'Beach, rides, aquarium — one island by cable car'},{e:'🍜',n:'Maxwell Food Centre',d:'Michelin-star chicken rice for SGD 5'}],
   paris:      [{e:'🗼',n:'Eiffel Tower',d:'Best at night when it sparkles — book months ahead'},{e:'🖼',n:'Louvre Museum',d:'World\'s largest museum — allow 3hrs, book skip-the-line'},{e:'⛪',n:'Notre-Dame Cathedral',d:'Gothic masterpiece rebuilt — exterior walk is free'},{e:'🛳',n:'Seine River Cruise',d:'Bateaux Mouches — see every landmark at dusk'},{e:'🎨',n:"Musée d'Orsay",d:'Best impressionist collection — Monet, Renoir, Van Gogh'},{e:'🌹',n:'Montmartre at Sunset',d:'Bohemian hilltop with Sacré-Cœur panoramas'},{e:'🏰',n:'Palace of Versailles',d:'Louis XIV\'s opulent palace and 800ha gardens'}],
   london:     [{e:'👑',n:'Tower of London',d:'900yr fortress with Crown Jewels — book Yeoman tour'},{e:'🎡',n:'London Eye',d:'Giant Ferris wheel — sunset slots sell out fast'},{e:'🏛',n:'British Museum',d:'Rosetta Stone, mummies — all free'},{e:'🌿',n:'Kew Gardens',d:'UNESCO Royal Botanic Gardens — stunning all year'},{e:'🎭',n:'West End Theatre',d:'Book tkts.co.uk for discounts'},{e:'🛍',n:'Borough Market',d:'London\'s oldest food market — extraordinary food'}],
+  vienna:     [{e:'🏰',n:'Schönbrunn Palace',d:'Habsburg summer palace — baroque gardens and 1,441 rooms'},{e:'🎼',n:'Vienna State Opera',d:'World-class opera house — book a cheap standing-room ticket'},{e:'🛍',n:'Naschmarkt',d:"Vienna's most popular market — food stalls and street food"},{e:'⛪',n:"St. Stephen's Cathedral",d:"Gothic masterpiece with a distinctive tiled roof"},{e:'🎨',n:'Belvedere Palace',d:"Home to Klimt's The Kiss, set in baroque gardens"}],
+  prague:     [{e:'🌉',n:'Charles Bridge',d:'14th-century stone bridge lined with statues — best at sunrise'},{e:'🏰',n:'Prague Castle',d:"World's largest ancient castle complex"},{e:'🕰',n:'Astronomical Clock',d:'Medieval clock in Old Town Square — hourly apostle parade'},{e:'🏘',n:'Old Town Square',d:'Colourful baroque buildings at the heart of historic Prague'},{e:'🏯',n:'Petřín Hill',d:'Mini Eiffel Tower lookalike with panoramic city views'}],
+  budapest:   [{e:'♨',n:'Széchenyi Thermal Bath',d:"Europe's largest medicinal bath complex — outdoor thermal pools"},{e:'🏛',n:'Hungarian Parliament Building',d:'Neo-Gothic riverside landmark — best viewed from across the Danube'},{e:'🌉',n:'Chain Bridge',d:'Iconic suspension bridge linking Buda and Pest'},{e:'🏰',n:"Fisherman's Bastion",d:'Fairytale terrace with panoramic Danube views'},{e:'🕍',n:'Great Synagogue',d:"Europe's largest synagogue, in the Jewish Quarter"}],
   dubai:      [{e:'🏙',n:'Burj Khalifa',d:'World\'s tallest building — sunset tickets sell fast'},{e:'🛍',n:'Dubai Mall',d:'World\'s largest mall with aquarium and ice rink'},{e:'🏜',n:'Desert Safari',d:'Dune bashing, camel ride, belly dance, BBQ under stars'},{e:'🌊',n:'Dubai Marina Walk',d:'7km waterfront lined with restaurants and yachts'},{e:'🕌',n:'Sheikh Zayed Grand Mosque',d:'One of the world\'s largest mosques — free entry'},{e:'🎡',n:'Ain Dubai',d:'World\'s largest observation wheel on Bluewaters Island'}],
   rome:       [{e:'🏛',n:'Colosseum & Roman Forum',d:'2,000-year-old amphitheatre — book skip-the-line weeks ahead'},{e:'⛲',n:'Trevi Fountain',d:'Baroque masterpiece — magical at midnight'},{e:'🏛',n:'Vatican Museums',d:'Michelangelo\'s ceiling — book early entry'},{e:'🍕',n:'Trastevere Food Walk',d:'Cobblestone neighbourhood with best Roman trattorias'},{e:'🏰',n:'Castel Sant\'Angelo',d:'Former papal fortress with great Tiber views'}],
   maldives:   [{e:'🤿',n:'House Reef Snorkelling',d:'Step off your villa deck into world-class coral'},{e:'🏝',n:'Sandbank Picnic',d:'Private champagne picnic on a deserted sandbank'},{e:'🌅',n:'Sunset Dolphin Cruise',d:'Spinner dolphins at dusk — extraordinary'},{e:'🎣',n:'Night Fishing',d:'Traditional Maldivian fishing by lantern light'},{e:'💆',n:'Overwater Spa',d:'Massage pavilion over the lagoon — book 2hr ritual'}],
@@ -1251,6 +1254,15 @@ const DEST_FOOD = {
   dubai:    ['🥘 Shawarma','🍢 Kebabs & Mezze','🦐 Emirati Seafood','🍱 Arabic Breakfast','🫕 Hummus & Pita','🥤 Fresh Juice & Faloodah','🍰 Luqaimat Dumplings'],
   paris:    ['🥐 Croissant & Café au Lait','🍷 Wine & Cheese','🐌 Escargot','🥩 Steak Frites','🧅 French Onion Soup','🫕 Bouillabaisse','🍰 Crème Brûlée'],
   london:   ['🍟 Fish & Chips','🍳 Full English Breakfast','🥩 Sunday Roast','☕ Afternoon Tea','🌮 Borough Market Tasting','🍺 Real Ale at a Pub'],
+  vienna:   ['☕ Viennese Coffee & Cake','🍰 Sachertorte','🥩 Wiener Schnitzel','🥞 Kaiserschmarrn','🌭 Würstelstand Sausage'],
+  prague:   ['🍺 Czech Pilsner Beer','🥩 Svíčková (Beef in Cream Sauce)','🥨 Trdelník Pastry','🍲 Czech Goulash','🧀 Smažený Sýr (Fried Cheese)'],
+  budapest: ['🍲 Goulash (Gulyás)','🍰 Chimney Cake (Kürtőskalács)','🍷 Tokaji Wine','🌶 Paprika Chicken','🍞 Lángos Fried Dough','♨ Thermal Bath Café'],
+  warsaw:   ['🥟 Pierogi','🍲 Żurek Sour Rye Soup','🍖 Bigos Hunter Stew','🍰 Sernik Cheesecake','🍺 Polish Craft Beer'],
+  krakow:   ['🥨 Obwarzanek Krakowski','🥟 Pierogi Ruskie','🍲 Żurek Soup','🍺 Local Craft Beer','🍰 Kremówka Cream Cake'],
+  croatia:  ['🦑 Fresh Seafood & Squid Ink Risotto','🍖 Ćevapi Grilled Meat','🍷 Local Dalmatian Wine','🫒 Olive Oil Tasting','🍦 Gelato by the Adriatic'],
+  bucharest:['🥘 Sarmale (Cabbage Rolls)','🍲 Ciorbă Sour Soup','🥟 Mici Grilled Sausages','🍷 Local Romanian Wine','🍰 Papanași Fried Doughnuts'],
+  sofia:    ['🥗 Shopska Salad','🍖 Kavarma Meat Stew','🥧 Banitsa Cheese Pastry','🍷 Bulgarian Wine','🥛 Bulgarian Yogurt'],
+  ljubljana:['🥧 Potica Nut Roll','🍖 Kranjska Klobasa Sausage','🍷 Slovenian Wine','🐟 Lake Bled Cream Cake','☕ Riverside Café'],
   'chiang mai':['🍜 Khao Soi (coconut curry noodle soup)','🌭 Sai Ua Northern Pork Sausage','🥗 Nam Prik Ong Chilli Dip','🍡 Kanom Jeen Nam Ngeow Noodles','☕ Akha Ama Hilltribe Coffee','🍵 Doi Mae Salong Oolong Tea','🫕 Gaeng Hung Lay Northern Curry','🥭 Mango Sticky Rice'],
   'chiang rai':['🍜 Khao Soi (sweeter coconut broth)','🌭 Northern Sai Ua Sausage','🥢 Yunnan-style Noodles (Doi Mae Salong)','🍵 Doi Mae Salong Oolong Tea','🐟 Kok River Fresh Fish Dishes','🫕 Gaeng Hung Lay Northern Curry','🍡 Kanom Krok Coconut Pancakes','🥗 Larb Moo Northern Style'],
   china:       ['🥟 Xiaolongbao Soup Dumplings','🍜 Dan Dan Noodles','🦆 Peking Duck','🥘 Mapo Tofu','🍢 Street Skewers (Chuanr)','🍱 Dim Sum Brunch','🫕 Hot Pot (Huo Guo)','🍚 Clay Pot Rice'],
@@ -1289,6 +1301,17 @@ const DEST_TRANSPORT = {
   greece:   ['✈ Flights','⛴ Ferry between Islands','🚕 Taxi','🛵 ATV/Scooter','🚌 KTEL Bus','🚗 Rental Car'],
   paris:    ['✈ Flights','🚇 Paris Métro','🚲 Vélib\' Bike','🛳 Batobus River Boat','🚕 Uber','🚄 RER Train'],
   london:   ['✈ Flights','🚇 London Underground','🚌 Double-Decker Bus','🚕 Black Cab','🚲 Santander Cycle','🚄 Elizabeth Line'],
+  vienna:   ['✈ Flights','🚇 U-Bahn Metro','🚊 Vienna Trams','🚆 Railjet to Budapest/Prague','🚕 Uber/Bolt App','🚲 Citybike Wien'],
+  prague:   ['✈ Flights','🚇 Prague Metro (3 lines)','🚊 Historic Trams','🚶 Old Town on foot','🚆 Train to Český Krumlov (3h)','🚕 Bolt/Uber App'],
+  budapest: ['✈ Flights','🚇 Budapest Metro (M1–M4)','🚊 Tram 2 (Danube views)','⛴ Danube River Cruise','🚆 Train to Vienna (2h 30m)','🚕 Bolt App'],
+  warsaw:   ['✈ Flights','🚇 Warsaw Metro','🚊 Trams','🚆 Train to Kraków (2h 30m)','🚕 Bolt/Uber App','🚲 Veturilo Bike Share'],
+  krakow:   ['✈ Flights (via hub)','🚶 Old Town on foot','🚆 Train from Warsaw (2h 30m)','🚌 Bus to Auschwitz-Birkenau','🚕 Bolt/Uber App','🚲 Wavelo Bike Share'],
+  bratislava:['✈ Flights (via Vienna, 1h drive)','🚶 Old Town on foot','🚊 Trams','🚆 Train to Vienna/Budapest','🚕 Bolt App'],
+  zagreb:   ['✈ Flights','🚊 Trams','🚌 Bus to Plitvice Lakes','🚆 Train to Split','🚕 Uber/Bolt App'],
+  dubrovnik:['✈ Flights','🚌 Local Bus (Old Town + Lapad)','⛴ Ferry to Islands','🚕 Taxi/Uber App','🚶 Old Town walls on foot'],
+  bucharest:['✈ Flights','🚇 Bucharest Metro','🚊 Trams','🚕 Uber/Bolt App','🚆 Train to Brașov (2h 30m)'],
+  sofia:    ['✈ Flights','🚇 Sofia Metro','🚊 Trams','🚕 Uber/Bolt App','🚌 Bus to Plovdiv'],
+  ljubljana:['✈ Flights (via hub)','🚶 Old Town on foot','🚌 City Bus','🚕 Uber/Bolt App','🚆 Train to Lake Bled'],
   'chiang mai':['✈ Flights (KUL→CNX)','🚕 Grab App','🛺 Songthaew Red Trucks','🛵 Scooter Rental','🚲 Bicycle (Old City)','🚌 Green Bus (CM↔CR)'],
   'chiang rai':['✈ Flights (KUL→CEI)','🚕 Grab App','🛺 Songthaew','🚌 Green Bus (CM↔CR)','🚕 Private Driver (day trips)','🛵 Scooter Rental'],
   china:       ['✈ Flights','🚄 High-Speed Rail (CRH)','🚇 City Metro/Subway','🚕 DiDi App (Uber equiv.)','🚌 Long-distance Bus','🛳 Yangtze River Cruise'],
@@ -1319,6 +1342,17 @@ const ALIAS={
   'busan':'busan','jeju':'jeju','제주':'jeju','부산':'busan','서울':'seoul',
   'seoul':'seoul','incheon':'seoul','daegu':'korea','daejeon':'korea','gwangju':'korea',
   'athens':'greece','santorini':'greece','mykonos':'greece','crete':'greece',
+  // Eastern Europe
+  'vienna':'vienna','prague':'prague','budapest':'budapest','warsaw':'warsaw','krakow':'krakow','kraków':'krakow',
+  'bratislava':'bratislava','zagreb':'zagreb','dubrovnik':'dubrovnik','bucharest':'bucharest','sofia':'sofia','ljubljana':'ljubljana',
+  'czech':'prague','czech republic':'prague','cesky krumlov':'prague','český krumlov':'prague','karlovy vary':'prague',
+  'hungary':'budapest','eger':'budapest',
+  'poland':'warsaw','gdansk':'warsaw','gdańsk':'warsaw','wroclaw':'warsaw','wrocław':'warsaw',
+  'slovakia':'bratislava',
+  'croatia':'zagreb','split':'zagreb','hvar':'zagreb','plitvice':'zagreb',
+  'romania':'bucharest','brasov':'bucharest','braşov':'bucharest',
+  'bulgaria':'sofia','plovdiv':'sofia',
+  'slovenia':'ljubljana','bled':'ljubljana','lake bled':'ljubljana',
   'jaipur':'india','mumbai':'india','delhi':'india','goa':'india','agra':'india','kerala':'india',
   // Canada
   'canada':'canada','vancouver':'vancouver','whistler':'whistler',
@@ -1378,6 +1412,14 @@ const COUNTRY_CITIES={
   netherlands: ['Amsterdam','Rotterdam','Hague','Bruges'],
   switzerland: ['Zurich','Geneva','Lucerne','Bern','Interlaken','Zermatt'],
   austria:     ['Vienna','Salzburg','Innsbruck','Hallstatt'],
+  czech:       ['Prague','Český Krumlov','Karlovy Vary'],
+  hungary:     ['Budapest','Eger'],
+  poland:      ['Warsaw','Kraków','Gdańsk','Wrocław','Zakopane'],
+  slovakia:    ['Bratislava','High Tatras'],
+  croatia:     ['Zagreb','Dubrovnik','Split','Hvar','Plitvice Lakes'],
+  romania:     ['Bucharest','Brașov','Sibiu','Bran Castle'],
+  bulgaria:    ['Sofia','Plovdiv','Veliko Tarnovo'],
+  slovenia:    ['Ljubljana','Lake Bled','Piran'],
   portugal:    ['Lisbon','Porto','Algarve','Sintra','Madeira'],
   turkey:      ['Istanbul','Cappadocia','Antalya','Pamukkale','Ephesus'],
   india:       ['Delhi','Mumbai','Jaipur','Agra','Goa','Kerala','Varanasi'],
@@ -1421,7 +1463,15 @@ const COUNTRY_DETECT=[
   [/germany|german|berlin|munich|hamburg/i,'germany'],
   [/netherlands|dutch|amsterdam|holland/i,'netherlands'],
   [/switzerland|swiss|zurich|geneva|lucerne|interlaken|zermatt/i,'switzerland'],
-  [/austria|austrian|vienna|salzburg/i,'austria'],
+  [/austria|austrian|vienna|salzburg|innsbruck|hallstatt/i,'austria'],
+  [/czech|prague|cesky\s*krumlov|karlovy\s*vary/i,'czech'],
+  [/hungary|hungarian|budapest|\beger\b/i,'hungary'],
+  [/poland|polish|warsaw|krakow|kraków|gdansk|gdańsk|wroclaw|wrocław/i,'poland'],
+  [/slovakia|slovak|bratislava/i,'slovakia'],
+  [/croatia|croatian|zagreb|dubrovnik|\bsplit\b|\bhvar\b/i,'croatia'],
+  [/romania|romanian|bucharest|brasov|braşov/i,'romania'],
+  [/bulgaria|bulgarian|sofia|plovdiv/i,'bulgaria'],
+  [/slovenia|slovenian|ljubljana|\bbled\b/i,'slovenia'],
   [/portugal|lisbon|porto|algarve/i,'portugal'],
   [/turkey|turkish|istanbul|cappadocia/i,'turkey'],
   [/india|indian|delhi|mumbai|jaipur|agra|\bgoa\b/i,'india'],
@@ -1452,6 +1502,8 @@ const KEY_TO_COUNTRY={
   taiwan:'Taiwan',canada:'Canada',usa:'USA',australia:'Australia','new zealand':'New Zealand',
   uk:'UK',france:'France',italy:'Italy',spain:'Spain',greece:'Greece',germany:'Germany',
   netherlands:'Netherlands',switzerland:'Switzerland',austria:'Austria',portugal:'Portugal',
+  czech:'Czech Republic',hungary:'Hungary',poland:'Poland',slovakia:'Slovakia',
+  croatia:'Croatia',romania:'Romania',bulgaria:'Bulgaria',slovenia:'Slovenia',
   turkey:'Turkey',india:'India',dubai:'UAE',egypt:'Egypt',morocco:'Morocco',
   'south africa':'South Africa',peru:'Peru',brazil:'Brazil',mexico:'Mexico',iceland:'Iceland',
   scandinavia:'Scandinavia',norway:'Norway',sweden:'Sweden',
@@ -2092,7 +2144,7 @@ async function callGemini(p,key,model){
     // Route through Netlify function — key stays server-side
     const r=await fetch('/api/gemini',{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model,contents:[{parts:[{text:p}]}],generationConfig:{temperature:0.7,maxOutputTokens:8000}})
+      body:JSON.stringify({model,contents:[{parts:[{text:p}]}],generationConfig:{temperature:0.4,maxOutputTokens:8000}})
     });
     if(!r.ok){const e=await r.json();throw new Error(e.error?.message||'Proxy HTTP '+r.status);}
     const d=await r.json();if(d.error)throw new Error(d.error.message);
@@ -2101,7 +2153,7 @@ async function callGemini(p,key,model){
   if(!key)throw new Error('No Gemini API key');
   const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
     {method:'POST',headers:{'Content-Type':'application/json'},
-     body:JSON.stringify({contents:[{parts:[{text:p}]}],generationConfig:{temperature:0.7,maxOutputTokens:16384}})});
+     body:JSON.stringify({contents:[{parts:[{text:p}]}],generationConfig:{temperature:0.4,maxOutputTokens:16384}})});
   if(!r.ok){const e=await r.json();throw new Error(e.error?.message||'HTTP '+r.status);}
   const d=await r.json();if(d.error)throw new Error(d.error.message);
   const t=d.candidates?.[0]?.content?.parts?.[0]?.text||'';if(!t)throw new Error('Empty response');return t;
@@ -2110,7 +2162,7 @@ async function callDeepSeek(p,key,model){
   if(NETLIFY_MODE){
     const r=await fetch('/api/openai',{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model,messages:[{role:'user',content:p}],max_tokens:8000,temperature:0.7})
+      body:JSON.stringify({model,messages:[{role:'user',content:p}],max_tokens:8000,temperature:0.4})
     });
     if(!r.ok){const e=await r.json();throw new Error(e.error?.message||'Proxy HTTP '+r.status);}
     const d=await r.json();if(d.error)throw new Error(d.error.message);
@@ -2119,7 +2171,7 @@ async function callDeepSeek(p,key,model){
   if(!key)throw new Error('No DeepSeek API key');
   const r=await fetch('https://api.deepseek.com/v1/chat/completions',
     {method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
-     body:JSON.stringify({model,messages:[{role:'user',content:p}],max_tokens:16000,temperature:0.7})});
+     body:JSON.stringify({model,messages:[{role:'user',content:p}],max_tokens:16000,temperature:0.4})});
   if(!r.ok){const e=await r.json();throw new Error(e.error?.message||'HTTP '+r.status);}
   const d=await r.json();if(d.error)throw new Error(d.error.message);
   const t=d.choices?.[0]?.message?.content||'';if(!t)throw new Error('Empty response');return t;
@@ -2146,7 +2198,7 @@ async function callOpenAI(p,key,model){
   if(NETLIFY_MODE){
     const r=await fetch('/api/openai',{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model,messages:[{role:'user',content:p}],max_tokens:8000,temperature:0.7})
+      body:JSON.stringify({model,messages:[{role:'user',content:p}],max_tokens:8000,temperature:0.4})
     });
     if(!r.ok){const e=await r.json();throw new Error(e.error?.message||'Proxy HTTP '+r.status);}
     const d=await r.json();if(d.error)throw new Error(d.error.message);
@@ -2155,7 +2207,7 @@ async function callOpenAI(p,key,model){
   if(!key)throw new Error('No OpenAI API key');
   const r=await fetch('https://api.openai.com/v1/chat/completions',
     {method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
-     body:JSON.stringify({model,messages:[{role:'user',content:p}],max_tokens:16000,temperature:0.7})});
+     body:JSON.stringify({model,messages:[{role:'user',content:p}],max_tokens:16000,temperature:0.4})});
   if(!r.ok){const e=await r.json();throw new Error(e.error?.message||'HTTP '+r.status);}
   const d=await r.json();if(d.error)throw new Error(d.error.message);
   const t=d.choices?.[0]?.message?.content||'';if(!t)throw new Error('Empty response');return t;
@@ -2304,6 +2356,11 @@ function _correctCurrency(destStr, aiCurrency){
     [/australia|sydney|melbourne|brisbane|perth/,              'AUD (Australian Dollar)'],
     [/new zealand/,                                             'NZD (New Zealand Dollar)'],
     [/uk|united kingdom|london|edinburgh|manchester/,           'GBP (British Pound)'],
+    [/czech|prague|cesky krumlov|karlovy vary/,                 'CZK (Czech Koruna)'],
+    [/hungary|budapest|eger/,                                   'HUF (Hungarian Forint)'],
+    [/poland|warsaw|krakow|gdansk|wroclaw/,                     'PLN (Polish Zloty)'],
+    [/romania|bucharest|brasov/,                                'RON (Romanian Leu)'],
+    [/bulgaria|sofia|plovdiv/,                                  'BGN (Bulgarian Lev)'],
     [/europe|france|paris|germany|italy|spain|amsterdam/,      'EUR (Euro)'],
     [/turkey|istanbul|ankara/,                                  'TRY (Turkish Lira)'],
     [/uae|dubai|abu dhabi/,                                    'AED (UAE Dirham)'],
@@ -3093,6 +3150,14 @@ const CITY_COORDS={
   'tallinn':[59.4370,24.7536],'vilnius':[54.6872,25.2797],
   'monaco':[43.7384,7.4246],'luxembourg':[49.6117,6.1319],
   'salzburg':[47.8095,13.0550],'innsbruck':[47.2692,11.4041],
+  // Eastern Europe
+  'cesky krumlov':[48.8127,14.3175],'karlovy vary':[50.2311,12.8722],
+  'bratislava':[48.1486,17.1077],'zagreb':[45.8150,15.9819],
+  'hvar':[43.1729,16.4413],'bucharest':[44.4268,26.1025],
+  'brasov':[45.6427,25.5887],'sofia':[42.6977,23.3219],
+  'plovdiv':[42.1354,24.7453],'ljubljana':[46.0569,14.5058],
+  'bled':[46.3683,14.1146],'gdansk':[54.3520,18.6466],
+  'wroclaw':[51.1079,17.0385],'eger':[47.9025,20.3772],
   // Asia — Japan
   'tokyo':[35.6762,139.6503],'osaka':[34.6937,135.5023],
   'kyoto':[35.0116,135.7681],'hiroshima':[34.3853,132.4553],
@@ -3528,6 +3593,14 @@ const SOCKET_DB={
   'netherlands':{t:'F',plug:'Round 2 pins + side earth',v:'230V',f:'50Hz',icon:'🇳🇱'},
   'switzerland':{t:'J',plug:'3 round pins (unique Swiss)',v:'230V',f:'50Hz',icon:'🇨🇭',note:'Type C adapters also work in Switzerland'},
   'austria':{t:'F',plug:'Round 2 pins + side earth',v:'230V',f:'50Hz',icon:'🇦🇹'},
+  'czech':{t:'E',plug:'Round 2 pins + earth socket',v:'230V',f:'50Hz',icon:'🇨🇿'},
+  'hungary':{t:'C/F',plug:'Round 2 pins',v:'230V',f:'50Hz',icon:'🇭🇺'},
+  'poland':{t:'C/E',plug:'Round 2 pins',v:'230V',f:'50Hz',icon:'🇵🇱'},
+  'slovakia':{t:'E',plug:'Round 2 pins + earth socket',v:'230V',f:'50Hz',icon:'🇸🇰'},
+  'croatia':{t:'C/F',plug:'Round 2 pins',v:'230V',f:'50Hz',icon:'🇭🇷'},
+  'romania':{t:'C/F',plug:'Round 2 pins',v:'230V',f:'50Hz',icon:'🇷🇴'},
+  'bulgaria':{t:'C/F',plug:'Round 2 pins',v:'230V',f:'50Hz',icon:'🇧🇬'},
+  'slovenia':{t:'C/F',plug:'Round 2 pins',v:'230V',f:'50Hz',icon:'🇸🇮'},
   'scandinavia':{t:'F',plug:'Round 2 pins + side earth',v:'230V',f:'50Hz',icon:'🌍'},
   'norway':{t:'F',plug:'Round 2 pins + side earth',v:'230V',f:'50Hz',icon:'🇳🇴'},
   'sweden':{t:'F',plug:'Round 2 pins + side earth',v:'230V',f:'50Hz',icon:'🇸🇪'},
