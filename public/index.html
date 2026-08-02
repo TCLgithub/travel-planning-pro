@@ -4300,9 +4300,16 @@ function buildCityMaps(t){
     if(MACAU_RE.test(_ctx))return'Macao';
     return countryNameFor(_ctx);
   }
+  // Builds "Name, City, Country" so a generically-named stop (e.g. "Bird
+  // Interpretive Center", "Nursery") gets geocoded near the right city
+  // instead of matching a same-named place anywhere else in the country —
+  // country alone isn't enough disambiguation for common place names.
   function qualify(name,cityStr){
     const c=countryFor(cityStr);
-    return `${name}${c?', '+c:''}`;
+    const n=(name||'').toLowerCase().trim();
+    const csBase=(cityStr||'').split(',')[0].trim().toLowerCase();
+    const needsCity=cityStr&&n!==csBase&&!n.includes(csBase);
+    return `${name}${needsCity?', '+cityStr:''}${c?', '+c:''}`;
   }
   const homeCountry=homeCityRaw?countryNameFor(homeCityRaw):'';
   const homeQ=homeCityRaw?(homeCountry?`${homeCityRaw}, ${homeCountry}`:homeCityRaw):'';
