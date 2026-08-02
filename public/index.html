@@ -2931,34 +2931,92 @@ async function loadAttractionPhotos(arr){
 
 async function loadItinPhotos(t){
   const gKey=localStorage.getItem('tppGoogleKey')||window.TRAVEL_PRO_KEYS?.google||'';
-  if(!gKey||!t?.days)return;
+  if(!t?.days)return;
+
+  // Verify a URL actually loads before committing it — same pre-check used for Highlights photos
+  const tryLoad=src=>new Promise(resolve=>{
+    if(!src){resolve(false);return;}
+    const test=new Image();
+    test.onload=()=>resolve(true);
+    test.onerror=()=>resolve(false);
+    setTimeout(()=>resolve(false),7000);
+    test.src=src;
+  });
+
   for(let di=0;di<t.days.length;di++){
     const day=t.days[di];
     for(let ai=0;ai<(day.activities||[]).length;ai++){
       const a=day.activities[ai];
       if(!['attraction','restaurant','experience'].includes(a.type))continue;
       const img=$('act-ph-'+di+'-'+ai);
-      if(!img)continue;
-      const query=`${(a.name||'').replace(/^(visit|see|explore|lunch at|dinner at|breakfast at|check.in at|stop at)\s+/i,'').trim()} ${day.city||''}`.trim();
-      if(!query)continue;
       const wrap=$('act-phw-'+di+'-'+ai);
-      try{
-        const r=await fetch('https://places.googleapis.com/v1/places:searchText',{
-          method:'POST',
-          headers:{'Content-Type':'application/json','X-Goog-Api-Key':gKey,'X-Goog-FieldMask':'places.photos'},
-          body:JSON.stringify({textQuery:query,pageSize:1})
-        });
-        const d=await r.json();
-        const photoName=d.places?.[0]?.photos?.[0]?.name;
-        if(photoName){
-          img.onload=()=>{img.style.display='block';if(wrap)wrap.querySelector('span')?.remove();};
-          img.onerror=()=>{if(wrap)wrap.remove();};  // remove entire wrapper on broken image
-          img.src=`https://places.googleapis.com/v1/${photoName}/media?maxWidthPx=400&key=${gKey}`;
-        }else{
-          if(wrap)wrap.remove(); // no photo found — remove wrapper entirely
-        }
-      }catch(e){if(wrap)wrap.remove();}
-      await new Promise(res=>setTimeout(res,150));
+      if(!img||!wrap)continue;
+      const name=cleanPlaceName(a.name);
+      const city=(day.city||'').trim();
+      if(!name){wrap.remove();continue;}
+
+      const commit=src=>{img.onload=()=>{img.style.display='block';wrap.querySelector('span')?.remove();};img.src=src;};
+      let found=false;
+
+      // 1) Google Places API — best quality, needs a key in Settings
+      if(gKey){
+        try{
+          const r=await fetch('https://places.googleapis.com/v1/places:searchText',{
+            method:'POST',
+            headers:{'Content-Type':'application/json','X-Goog-Api-Key':gKey,'X-Goog-FieldMask':'places.photos'},
+            body:JSON.stringify({textQuery:name+(city?' '+city:''),pageSize:1})
+          });
+          const d=await r.json();
+          const photoName=d.places?.[0]?.photos?.[0]?.name;
+          if(photoName){
+            const src=`https://places.googleapis.com/v1/${photoName}/media?maxWidthPx=400&key=${gKey}`;
+            if(await tryLoad(src)){commit(src);found=true;}
+          }
+        }catch(e){}
+      }
+
+      // 2) Wikipedia REST Summary — free, CORS, real photos for major landmarks
+      if(!found){
+        try{
+          for(const q of[name,name+' '+city]){
+            const r=await fetch('https://en.wikipedia.org/api/rest_v1/page/summary/'+encodeURIComponent(q));
+            if(!r.ok)continue;
+            const d=await r.json();
+            const src=d.thumbnail?.source;
+            if(src&&src.includes('wikimedia')&&await tryLoad(src)){commit(src);found=true;break;}
+          }
+        }catch(e){}
+      }
+
+      // 3) Wikimedia Commons pageimages API
+      if(!found){
+        try{
+          const r=await fetch('https://en.wikipedia.org/w/api.php?action=query&titles='+encodeURIComponent(name)+'&prop=pageimages&format=json&pithumbsize=400&origin=*');
+          const d=await r.json();
+          const page=Object.values(d.query?.pages||{})[0];
+          const src=page?.thumbnail?.source;
+          if(src&&await tryLoad(src)){commit(src);found=true;}
+        }catch(e){}
+      }
+
+      // 4) Wikimedia Commons full-text search — broader coverage for niche local spots
+      if(!found){
+        try{
+          const r=await fetch('https://commons.wikimedia.org/w/api.php?action=query&list=search&srsearch='+encodeURIComponent(name+(city?' '+city:''))+'&srnamespace=6&srlimit=3&format=json&origin=*');
+          const d=await r.json();
+          for(const result of(d.query?.search||[])){
+            const r2=await fetch('https://commons.wikimedia.org/w/api.php?action=query&titles='+encodeURIComponent(result.title)+'&prop=imageinfo&iiprop=url&iiurlwidth=400&format=json&origin=*');
+            const d2=await r2.json();
+            const pg=Object.values(d2.query?.pages||{})[0];
+            const src=pg?.imageinfo?.[0]?.thumburl||pg?.imageinfo?.[0]?.url;
+            if(src&&await tryLoad(src)){commit(src);found=true;break;}
+          }
+        }catch(e){}
+      }
+
+      // Nothing found anywhere — remove the empty box rather than leave a blank placeholder
+      if(!found)wrap.remove();
+      await new Promise(res=>setTimeout(res,120));
     }
   }
 }
@@ -4567,7 +4625,7 @@ function buildDays(t,total){
         <button class="btn btn-ghost btn-sm" style="font-size:.68rem;padding:.1rem .35rem" onclick="moveActivity(${di},${ai},1)" title="Move down">↓</button>
         <button class="btn btn-ghost btn-sm" style="font-size:.68rem;padding:.1rem .35rem;color:#c0392b;margin-left:auto" onclick="removeActivity(${di},${ai})">✕ Remove</button>
       </div>`:'';
-      const hasPhoto=gKeyAvail&&['attraction','restaurant','experience'].includes(a.type);
+      const hasPhoto=['attraction','restaurant','experience'].includes(a.type);
       const thumbHtml=hasPhoto
         ?`<div class="act-thumb-wrap" id="act-phw-${di}-${ai}"><span style="opacity:.4;font-size:1.2rem">${icon}</span><img class="act-thumb" id="act-ph-${di}-${ai}" alt="${(a.name||'').replace(/"/g,'&quot;')}" loading="lazy"></div>`
         :'';
