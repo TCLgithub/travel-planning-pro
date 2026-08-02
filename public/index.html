@@ -5874,9 +5874,15 @@ function printTab(tabId){
   if(!el){toast('No content to export');return;}
   const w=window.open('','_blank','width=900,height=700');
   if(!w){toast('⚠ Popup blocked — allow popups for this site to export PDF',5000);return;}
+  // Include the app's own live stylesheet first so rich card layouts (Highlights
+  // photo cards, Hotels cards, etc.) keep their real sizing/positioning in the
+  // print output — _exportStyles() alone never defined those classes, so photo
+  // boxes collapsed to unstyled slivers with the alt text showing through.
+  const _liveCss=document.querySelector('style')?.textContent||'';
   w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
   <title>${tripData.tripName||'Trip'} – ${titles[tabId]||''}</title>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet">
+  <style>${_liveCss}</style>
   <style>${_exportStyles()}</style></head><body>
   ${tabId==='journey'?'':`<h1>${tripData.tripName||'Trip'}</h1>
   <div style="font-size:.78rem;color:#7A6F62;margin-bottom:1.2rem">${titles[tabId]} · Printed ${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}</div>`}
