@@ -2320,6 +2320,43 @@ async function silentCallAI(prompt){
   throw new Error('No provider available');
 }
 
+// ── Auto-heal thin days ──────────────────────────────────────────────
+// A day can come back under-detailed even when its chunk parses as valid
+// JSON — e.g. the response got truncated mid-way through that day's
+// activities and repairJSON salvaged only what was complete before the cut.
+// Rather than leave a sparse day for the user to notice and fix by hand in
+// Edit mode, detect any day with suspiciously few activities (excluding the
+// first/last day, which are legitimately lighter arrival/departure days)
+// and ask the AI to round it out before the trip is saved.
+async function healThinDays(t){
+  const MIN_ACTIVITIES=3;
+  const days=t.days||[];
+  for(let i=0;i<days.length;i++){
+    const day=days[i];
+    const isEdgeDay=i===0||i===days.length-1;
+    const count=(day.activities||[]).length;
+    if(isEdgeDay||count>=MIN_ACTIVITIES)continue;
+    try{
+      const existing=(day.activities||[]).map(a=>a.name).filter(Boolean);
+      const healPrompt=`This single day of a travel itinerary looks incomplete — it only has ${count} activit${count===1?'y':'ies'}, likely from a cut-off response. Fill it out to a normal full day.
+City: ${day.city||''} | Date: ${day.date||''} | Day title: ${day.title||''}
+Existing activities to KEEP as-is: ${existing.length?JSON.stringify(existing):'(none)'}
+Add enough NEW attraction/restaurant/experience activities (do not duplicate the existing ones) so the day has 4-6 activities total, well-paced across morning/afternoon/evening.
+CRITICAL: Return ONLY valid JSON — the FULL activities array for this day (existing + new, in chronological time order), no markdown, no text outside JSON.
+{"activities":[{"time":"09:00","name":"string","description":"One sentence with key tip.","type":"attraction","emoji":"🏔","transport":"...","googleMapsUrl":"https://www.google.com/maps/search/?api=1&query=place","estimatedCost":"MYR 20","duration":"2h"}]}`;
+      const raw=await silentCallAI(healPrompt);
+      let c=raw.replace(/<think>[\s\S]*?<\/think>/gi,'').trim();
+      c=c.replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
+      const js=c.indexOf('{'),je=c.lastIndexOf('}');
+      if(js<0||je<0)continue;
+      c=c.slice(js,je+1);
+      let parsed;
+      try{parsed=JSON.parse(c);}catch(e){try{parsed=JSON.parse(repairJSON(c));}catch(e2){continue;}}
+      if(parsed?.activities?.length>count)day.activities=parsed.activities;
+    }catch(e){/* leave day as-is if healing fails — better than blocking the whole trip */}
+  }
+}
+
 // ══ JSON REPAIR (handles truncated AI responses) ══
 function repairJSON(s){
   // Track anchors = positions after each complete JSON value (safe cut-points)
@@ -2649,6 +2686,13 @@ CRITICAL: Return ONLY valid JSON — no markdown, no text outside JSON.
       hotelBudget,hotelStars,hotelType}};
     // Safety net: if AI returned wrong currency, snap to correct one based on destination
     tripData.currency=_correctCurrency(destStr,tripData.currency);
+    // Safety net: round out any day that came back thin (e.g. a truncated
+    // response) before saving, instead of leaving it for manual Edit-mode fixes
+    const _thinCount=(tripData.days||[]).filter((d,i,arr)=>i>0&&i<arr.length-1&&(d.activities||[]).length<3).length;
+    if(_thinCount){
+      toast(`⏳ Filling in ${_thinCount} under-detailed day${_thinCount>1?'s':''}…`,4000);
+      try{await healThinDays(tripData);}catch(e){console.error('healThinDays:',e);}
+    }
     saveTrip(tripData);
     try{renderItinerary(tripData);}catch(re){console.error('renderItinerary:',re);}
     goTab('itin');
@@ -8194,6 +8238,14 @@ CRITICAL: Return ONLY valid JSON — no markdown.
           : 'Modification: '+instruction
       }
     };
+
+    // Same thin-day safety net as fresh generation — a modify chunk can also
+    // come back truncated for one day while the rest complete fine.
+    const _thinCountMod=(tripData.days||[]).filter((d,i,arr)=>i>0&&i<arr.length-1&&(d.activities||[]).length<3).length;
+    if(_thinCountMod){
+      statusEl.textContent=`⏳ Filling in ${_thinCountMod} under-detailed day${_thinCountMod>1?'s':''}…`;
+      try{await healThinDays(tripData);}catch(e){console.error('healThinDays:',e);}
+    }
 
     saveTrip(tripData);
     try{ renderItinerary(tripData); }catch(e){ console.error('renderItinerary after modify:',e); }
