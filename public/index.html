@@ -2649,10 +2649,25 @@ CHUNK INSTRUCTION: This trip is ${days} days. Generate ONLY days 1–${chunk1End
       while(from<=days){
         const to=Math.min(from+CHUNK-1,days);
         toast(`⏳ Generating days ${from}–${to} of ${days}…`,8000);
+        // Give the AI real context on what's already been covered — without this,
+        // "no duplicate attractions" is an instruction it has no way to follow,
+        // since each chunk is a separate call with no memory of earlier ones.
+        // This is what let a later chunk silently re-loop through cities/sights
+        // already covered several days earlier.
+        const citySeq=[];
+        (t.days||[]).forEach(d=>{
+          const last=citySeq[citySeq.length-1];
+          if(last&&last.city===d.city)last.to=d.dayNumber;
+          else citySeq.push({city:d.city,from:d.dayNumber,to:d.dayNumber});
+        });
+        const citySummary=citySeq.map(c=>`${c.city}(D${c.from}${c.to!==c.from?'-'+c.to:''})`).join(', ');
+        const usedNames=[...new Set((t.days||[]).flatMap(d=>(d.activities||[]).map(a=>cleanPlaceName(a.name))).filter(Boolean))].slice(-40);
         const contPrompt=`Continue a ${days}-day travel itinerary for "${name}".
 
 TRIP: ${destStr} | ${start}→${end} | ${travellers} | Budget: ${budget} | Style: ${style} | Pace: ${pace} | Transport: ${transport} | Diet: ${diet} | Food: ${food}${nightsStr?`\n${nightsStr}`:''}
 Hotels: ${hotelCtx}
+Cities covered so far, in order: ${citySummary}
+Already used (do NOT repeat these, and do NOT revisit an earlier city to redo the same sights — only backtrack if the route genuinely requires passing through it again): ${usedNames.join(', ')||'(none yet)'}
 Previous day ended in: ${prevCity}
 
 Generate ONLY days ${from} through ${to}. Day ${from} date = ${dateOfDay(from)}, Day ${to} date = ${dateOfDay(to)}.
@@ -8184,9 +8199,23 @@ ${headerSchema}`;
       while(from<=totalDays&&stall<6){
         const to=Math.min(from+CHUNK-1,totalDays);
         statusEl.textContent=`⏳ Fetching days ${from}–${to}…`;
+        // Same "already covered" context as fresh generation — without it the
+        // AI has no way to know it already visited a city days earlier, which
+        // is how a modified trip could silently loop back through the same
+        // cities and sights it had already covered.
+        const citySeqMod=[];
+        (modified.days||[]).forEach(d=>{
+          const last=citySeqMod[citySeqMod.length-1];
+          if(last&&last.city===d.city)last.to=d.dayNumber;
+          else citySeqMod.push({city:d.city,from:d.dayNumber,to:d.dayNumber});
+        });
+        const citySummaryMod=citySeqMod.map(c=>`${c.city}(D${c.from}${c.to!==c.from?'-'+c.to:''})`).join(', ');
+        const usedNamesMod=[...new Set((modified.days||[]).flatMap(d=>(d.activities||[]).map(a=>cleanPlaceName(a.name))).filter(Boolean))].slice(-40);
         const contPrompt=`Continue the modified ${totalDays}-day trip "${tripData.tripName}".
 Modification applied: "${instruction}"
 Hotels: ${JSON.stringify(ctxObj.hotels)}
+Cities covered so far, in order: ${citySummaryMod}
+Already used (do NOT repeat these, and do NOT revisit an earlier city to redo the same sights — only backtrack if the route genuinely requires passing through it again): ${usedNamesMod.join(', ')||'(none yet)'}
 Previous day ended in: ${prevCity}
 Generate ONLY days ${from} through ${to}. Day ${from} date = ${dateOfMod(from)}, Day ${to} date = ${dateOfMod(to)}.
 Also include EVERY major sightseeing attraction from these days in "mustSeeAttractions" (not just one or two) — this feeds the Highlights tab.
