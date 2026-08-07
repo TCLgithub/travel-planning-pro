@@ -8114,7 +8114,20 @@ async function applyAIModification(){
 
   try{
     const meta=tripData._meta||{};
-    const totalDays=meta.days||(tripData.days||[]).length;
+    // If the instruction itself asks to add/remove days, adjust the target
+    // day count before building the prompt. Without this, the prompt told the
+    // AI "this is a fixed N-day trip, renumber 1-N" in the same breath as an
+    // instruction to add a day — a direct contradiction that could make the
+    // model produce a malformed or empty response instead of valid JSON.
+    let totalDays=meta.days||(tripData.days||[]).length;
+    const _addDayMatch=instruction.match(/\badd\s+(?:another|one|a|an|(\d+))\s*(?:more|extra)?\s*days?\b/i);
+    const _extendMatch=instruction.match(/\bextend(?:\s+(?:the\s+)?trip)?\s+(?:by\s+)?(\d+)\s*days?\b/i);
+    const _removeDayMatch=instruction.match(/\bremove\s+(?:the\s+)?(?:last|final)\s*(\d+)?\s*days?\b/i);
+    const _shortenMatch=instruction.match(/\bshorten(?:\s+(?:the\s+)?trip)?\s+(?:by\s+)?(\d+)\s*days?\b/i);
+    if(_addDayMatch)totalDays+=parseInt(_addDayMatch[1]||'1',10);
+    else if(_extendMatch)totalDays+=parseInt(_extendMatch[1],10);
+    else if(_removeDayMatch)totalDays=Math.max(1,totalDays-parseInt(_removeDayMatch[1]||'1',10));
+    else if(_shortenMatch)totalDays=Math.max(1,totalDays-parseInt(_shortenMatch[1],10));
     const destStr=(tripData.destinations||[]).join(', ');
     const isChinese=/china|taiwan|hong kong|beijing|shanghai|guangzhou|shenzhen|chengdu|taipei|macau/i.test(destStr);
 
