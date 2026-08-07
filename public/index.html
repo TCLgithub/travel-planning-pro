@@ -8168,9 +8168,6 @@ ${headerSchema}`;
 
     statusEl.textContent=`⏳ Modifying${needsChunks?' (chunk 1/'+Math.ceil(totalDays/CHUNK)+')':''}…`;
 
-    const raw=await silentCallAI(modPrompt);
-    statusEl.textContent='🔍 Parsing response…';
-
     function parseModJSON(text){
       let c=text.replace(/<think>[\s\S]*?<\/think>/gi,'').trim();
       c=c.replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
@@ -8179,6 +8176,41 @@ ${headerSchema}`;
       c=c.slice(js,je+1);
       try{return JSON.parse(c);}catch(e){return JSON.parse(repairJSON(c));}
     }
+    // Validates + retries/falls back across providers — previously this used
+    // silentCallAI, which accepts whatever the FIRST provider returns with no
+    // validation at all, so a single format hiccup from one provider (e.g.
+    // Gemini prepending stray text) failed the whole modification instead of
+    // trying the next provider the way fresh generation already does.
+    function validateModJSON(text){
+      let c=text.replace(/<think>[\s\S]*?<\/think>/gi,'').trim();
+      c=c.replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
+      const js=c.indexOf('{'),je=c.lastIndexOf('}');
+      if(js<0||je<0)throw new Error('No JSON found in response');
+      c=c.slice(js,je+1);
+      try{const p=JSON.parse(c);if(p.days?.length)return;}catch(e){}
+      try{const p=JSON.parse(repairJSON(c));if(p.days?.length)return;}catch(e){}
+      throw new Error('Response has no usable day data — trying next provider');
+    }
+    // Same idea for continuation chunks — accept a bare array too, mirroring
+    // the fresh-generation continuation validator.
+    function validateContJSONMod(text){
+      let c=text.replace(/<think>[\s\S]*?<\/think>/gi,'').trim();
+      c=c.replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
+      if(c.startsWith('[')){
+        try{const p=JSON.parse(c);if(Array.isArray(p)&&p.length)return;}catch(e){}
+        try{const p=JSON.parse(repairJSON(c));if(Array.isArray(p)&&p.length)return;}catch(e){}
+      }
+      const js=c.indexOf('{'),je=c.lastIndexOf('}');
+      if(js>=0&&je>=0){
+        c=c.slice(js,je+1);
+        try{const p=JSON.parse(c);if(p.days?.length)return;}catch(e){}
+        try{const p=JSON.parse(repairJSON(c));if(p.days?.length)return;}catch(e){}
+      }
+      throw new Error('No continuation days in response');
+    }
+
+    const{text:raw}=await callWithFallback(modPrompt,validateModJSON);
+    statusEl.textContent='🔍 Parsing response…';
 
     let modified=parseModJSON(raw);
     if(!modified.days?.length) throw new Error('AI response has no day data — try rephrasing your request');
@@ -8222,7 +8254,8 @@ Also include EVERY major sightseeing attraction from these days in "mustSeeAttra
 CRITICAL: Return ONLY valid JSON — no markdown.
 {"days":[{"dayNumber":${from},"date":"${dateOfMod(from)}","title":"string","theme":"emoji Theme","city":"string","activities":[{"time":"09:00","name":"string","description":"string","type":"attraction","emoji":"🏔","transport":"string","googleMapsUrl":"https://www.google.com/maps/search/?api=1&query=place","estimatedCost":"MYR 20","duration":"2h"}]}],
 "mustSeeAttractions":[{"name":"string","city":"string","emoji":"🏔","category":"string","dayNumber":${from},"description":"50-80 word description in 2-3 full sentences — never a single short sentence","estimatedCost":"string","duration":"2h","googleMapsUrl":"https://www.google.com/maps/search/?api=1&query=place"}]}`;
-        const ct=await silentCallAI(contPrompt);
+        let ct='';
+        try{ct=(await callWithFallback(contPrompt,validateContJSONMod)).text;}catch(e){/* all providers failed this chunk — leave ct empty, handled below */}
         let cont;
         try{
           let cc=ct.replace(/<think>[\s\S]*?<\/think>/gi,'').trim();
