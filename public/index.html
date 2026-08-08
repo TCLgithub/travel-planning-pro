@@ -4553,31 +4553,67 @@ function buildCityMaps(t){
     baseCity.push(isDayTrip?prevBase:city);
   }
 
+  // ── Resolve each day's ACTUAL hotel from explicit "check-in" mentions ──
+  // day.city labelling drifts even within one trip — e.g. a broad "Bali"
+  // for the first chunk of days, then the more specific "Seminyak" once a
+  // later chunk is generated, describing the exact same hotel. Diffing
+  // those strings (baseCity above) can't tell that apart from a real
+  // relocation. A "Check-in at X" activity names the hotel directly, so
+  // it wins whenever present and simply carries forward on days without
+  // one; the city-string logic above is only the fallback when no hotel
+  // can be matched at all (e.g. trips generated without a hotels array).
+  function matchHotelInText(text){
+    const m=(text||'').match(/check.?[- ]?in\s*(?:at|to)?\s*(.+)/i);
+    if(!m)return null;
+    const raw=m[1].toLowerCase().trim();
+    return (t.hotels||[]).find(hh=>{
+      const hn=(hh.name||'').toLowerCase().trim();
+      return hn&&(raw.includes(hn)||hn.includes(raw));
+    })||null;
+  }
+  const dayHotel=[];
+  for(let i=0;i<days.length;i++){
+    let found=null;
+    for(const act of(days[i].activities||[])){
+      found=matchHotelInText(act.name);
+      if(found)break;
+    }
+    dayHotel.push(found||(i>0?dayHotel[i-1]:findHotelForCity(baseCity[0]))||null);
+  }
+
   const cards=days.map((day,i)=>{
       const city=(day.city||'').trim();
       const todayBase=baseCity[i];
-      const h=findHotelForCity(todayBase);
+      const h=dayHotel[i]||findHotelForCity(todayBase);
       const _ctx=city+' '+allDests;
       const isCN=CHINA_RE.test(_ctx);
       const isTW=TAIWAN_RE.test(_ctx);
       const isKorea=/korea|korean|seoul|busan|jeju|incheon|daegu|daejeon|gwangju/i.test(_ctx);
       const cityQ=city?qualify(city,city):'';
-      const hotelQ=h?qualify(h.name,todayBase):(todayBase?qualify(todayBase,todayBase):cityQ);
+      const hotelQ=h?qualify(h.name,h.city||todayBase):(todayBase?qualify(todayBase,todayBase):cityQ);
       const hotelLabel=h?h.name:(todayBase||city||'destination');
 
       const prevBase=(i>0?baseCity[i-1]:'').trim();
       const nextBase=(i<days.length-1?baseCity[i+1]:'').trim();
+      const prevHotelObj=i>0?dayHotel[i-1]:null;
+      const nextHotelObj=i<days.length-1?dayHotel[i+1]:null;
       const isFirstDay=i===0;
       const isLastDay=i===days.length-1;
+
+      // Prefer comparing resolved hotel objects (reliable); fall back to
+      // the city-string comparison only when a hotel can't be resolved on
+      // both sides of the comparison.
+      const relocatedFromPrev=!isFirstDay&&(h&&prevHotelObj?h!==prevHotelObj:!!(prevBase&&normCity(prevBase)!==normCity(todayBase)));
+      const relocatingToNext=!isLastDay&&(h&&nextHotelObj?h!==nextHotelObj:!!(nextBase&&normCity(nextBase)!==normCity(todayBase)));
 
       // ── Origin: home city (day 1, if known), previous night's hotel (a
       // genuine overnight relocation happened), or today's own hotel
       // (staying put, including day-trip days which share last night's base) ──
       let originQ, originLabel;
       if(isFirstDay&&homeQ){originQ=homeQ;originLabel=homeCityRaw;}
-      else if(!isFirstDay&&prevBase&&normCity(prevBase)!==normCity(todayBase)){
-        const prevHotel=findHotelForCity(prevBase);
-        originQ=prevHotel?qualify(prevHotel.name,prevBase):qualify(prevBase,prevBase);
+      else if(relocatedFromPrev){
+        const prevHotel=prevHotelObj||findHotelForCity(prevBase);
+        originQ=prevHotel?qualify(prevHotel.name,prevHotel.city||prevBase):qualify(prevBase,prevBase);
         originLabel=prevHotel?prevHotel.name:prevBase;
       } else {originQ=hotelQ;originLabel=hotelLabel;}
 
@@ -4585,9 +4621,9 @@ function buildCityMaps(t){
       // (relocating today), or today's own hotel (staying put) ──
       let destQ, destLabel;
       if(isLastDay&&homeQ){destQ=homeQ;destLabel=homeCityRaw;}
-      else if(!isLastDay&&nextBase&&normCity(nextBase)!==normCity(todayBase)){
-        const nextHotel=findHotelForCity(nextBase);
-        destQ=nextHotel?qualify(nextHotel.name,nextBase):qualify(nextBase,nextBase);
+      else if(relocatingToNext){
+        const nextHotel=nextHotelObj||findHotelForCity(nextBase);
+        destQ=nextHotel?qualify(nextHotel.name,nextHotel.city||nextBase):qualify(nextBase,nextBase);
         destLabel=nextHotel?nextHotel.name:nextBase;
       } else {destQ=hotelQ;destLabel=hotelLabel;}
 
@@ -8215,6 +8251,7 @@ INSTRUCTIONS:
 - Apply ONLY the requested modification. Keep everything else as-is.
 - Renumber dayNumber sequentially 1–${totalDays}. Recalculate dates from ${meta.start}.
 - Update hotels/transportSummary/waypoints only if the modification requires it.
+- Within each day, arrange activities in a logical geographic order to minimise unnecessary travel — group nearby stops together, do not backtrack (e.g. do not go toward one area, detour elsewhere, then double back).
 - Include EVERY major sightseeing attraction from days 1–${chunk1End} in "mustSeeAttractions" (not just one or two per city) — this feeds the Highlights tab.${needsChunks?`
 CHUNK INSTRUCTION: This is a ${totalDays}-day trip. Generate ONLY days 1–${chunk1End} in "days". Remaining days will be requested separately.`:''}
 CRITICAL: Return ONLY valid JSON — no markdown, no code fences.
@@ -8304,6 +8341,7 @@ Cities covered so far, in order: ${citySummaryMod}
 Already used (do NOT repeat these, and do NOT revisit an earlier city to redo the same sights — only backtrack if the route genuinely requires passing through it again): ${usedNamesMod.join(', ')||'(none yet)'}
 Previous day ended in: ${prevCity}
 Generate ONLY days ${from} through ${to}. Day ${from} date = ${dateOfMod(from)}, Day ${to} date = ${dateOfMod(to)}.
+Within each day, arrange activities in a logical geographic order — group nearby stops together, do not backtrack.
 Also include EVERY major sightseeing attraction from these days in "mustSeeAttractions" (not just one or two) — this feeds the Highlights tab.
 CRITICAL: Return ONLY valid JSON — no markdown.
 {"days":[{"dayNumber":${from},"date":"${dateOfMod(from)}","title":"string","theme":"emoji Theme","city":"string","activities":[{"time":"09:00","name":"string","description":"string","type":"attraction","emoji":"🏔","transport":"string","googleMapsUrl":"https://www.google.com/maps/search/?api=1&query=place","estimatedCost":"MYR 20","duration":"2h"}]}],
