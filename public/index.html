@@ -2357,6 +2357,36 @@ CRITICAL: Return ONLY valid JSON — the FULL activities array for this day (exi
   }
 }
 
+// Modify Trip regenerates every day via chunked calls, so despite the
+// "keep everything else as-is" instruction, a day that wasn't the actual
+// target of the change can still lose activities during regeneration. This
+// asks the AI to reconcile the before/after activity lists for ONE day —
+// restoring anything genuinely dropped, without undoing the requested
+// change or duplicating what's already there.
+async function healRegressedDay(newDay,oldDay,instruction){
+  const oldNames=(oldDay.activities||[]).map(a=>a.name).filter(Boolean);
+  const newNames=(newDay.activities||[]).map(a=>a.name).filter(Boolean);
+  try{
+    const healPrompt=`A single day of a travel itinerary was regenerated as part of a trip-wide modification, but may have accidentally lost activities that had nothing to do with the requested change.
+MODIFICATION REQUESTED (applies to the whole trip — may or may not affect this specific day): "${instruction}"
+City: ${newDay.city||''} | Date: ${newDay.date||''} | Day title: ${newDay.title||''}
+Activities BEFORE the modification: ${JSON.stringify(oldNames)}
+Activities AFTER the modification (current): ${JSON.stringify(newNames)}
+If any activity from BEFORE is missing from AFTER and is clearly unrelated to the requested modification, add it back in a sensible time slot. Do NOT remove or duplicate anything already in AFTER. If nothing needs restoring, return the AFTER list unchanged.
+CRITICAL: Return ONLY valid JSON — the FULL activities array for this day, in chronological time order, no markdown, no text outside JSON.
+{"activities":[{"time":"09:00","name":"string","description":"One sentence with key tip.","type":"attraction","emoji":"🏔","transport":"...","googleMapsUrl":"https://www.google.com/maps/search/?api=1&query=place","estimatedCost":"MYR 20","duration":"2h"}]}`;
+    const raw=await silentCallAI(healPrompt);
+    let c=raw.replace(/<think>[\s\S]*?<\/think>/gi,'').trim();
+    c=c.replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
+    const js=c.indexOf('{'),je=c.lastIndexOf('}');
+    if(js<0||je<0)return;
+    c=c.slice(js,je+1);
+    let parsed;
+    try{parsed=JSON.parse(c);}catch(e){try{parsed=JSON.parse(repairJSON(c));}catch(e2){return;}}
+    if(parsed?.activities?.length>=newDay.activities.length)newDay.activities=parsed.activities;
+  }catch(e){/* leave day as-is if healing fails — better than blocking the whole trip */}
+}
+
 // ══ JSON REPAIR (handles truncated AI responses) ══
 function repairJSON(s){
   // Track anchors = positions after each complete JSON value (safe cut-points)
@@ -8216,6 +8246,12 @@ async function applyAIModification(){
 
   try{
     const meta=tripData._meta||{};
+    // Snapshot pre-modify days — used later to detect a day that lost
+    // activities it had nothing to do with the requested change (the AI
+    // regenerates ALL days via the chunked calls below, and despite the
+    // "keep everything else as-is" instruction, sometimes silently drops
+    // content from a day that wasn't actually the target).
+    const _preModifyDays=JSON.parse(JSON.stringify(tripData.days||[]));
     // If the instruction itself asks to add/remove days, adjust the target
     // day count before building the prompt. Without this, the prompt told the
     // AI "this is a fixed N-day trip, renumber 1-N" in the same breath as an
@@ -8425,6 +8461,22 @@ CRITICAL: Return ONLY valid JSON — no markdown.
     if(_thinCountMod){
       statusEl.textContent=`⏳ Filling in ${_thinCountMod} under-detailed day${_thinCountMod>1?'s':''}…`;
       try{await healThinDays(tripData);}catch(e){console.error('healThinDays:',e);}
+    }
+
+    // Regression check: when the day count didn't change, day numbers still
+    // line up 1:1 with the pre-modify trip, so any day that lost activities
+    // it had before — despite not being what the instruction targeted — can
+    // be detected directly and restored.
+    if(totalDays===_preModifyDays.length){
+      const _regressed=_preModifyDays
+        .map(oldDay=>({oldDay,newDay:(tripData.days||[]).find(d=>d.dayNumber===oldDay.dayNumber)}))
+        .filter(({oldDay,newDay})=>newDay&&(oldDay.activities||[]).length-(newDay.activities||[]).length>=2);
+      if(_regressed.length){
+        statusEl.textContent=`⏳ Restoring ${_regressed.length} day${_regressed.length>1?'s':''} that lost detail…`;
+        for(const{oldDay,newDay}of _regressed){
+          try{await healRegressedDay(newDay,oldDay,instruction);}catch(e){console.error('healRegressedDay:',e);}
+        }
+      }
     }
 
     saveTrip(tripData);
