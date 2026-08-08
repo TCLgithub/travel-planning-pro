@@ -4274,7 +4274,7 @@ function buildMap(t){
 function cleanPlaceName(name){
   return (name||'')
     .replace(/^(Breakfast|Lunch|Dinner|Supper|Morning|Afternoon|Evening|Night)\s+(at\s+)?/i,'')
-    .replace(/^(Visit|Explore|Arrive|Depart|Transfer\s+to|Check.in\s+(at)?|Check.out\s+(from)?)\s+/i,'')
+    .replace(/^(Visit|Explore|Arrive(\s+at)?|Depart(\s+from)?|Transfer\s+to|Check.in\s+(at)?|Check.out\s+(from)?)\s+/i,'')
     .replace(/\s*\(.*?\)\s*/g,' ') // strip parentheticals
     .replace(/\s*—.*$/,'')         // strip em-dash descriptions
     .trim();
@@ -4533,6 +4533,24 @@ function buildCityMaps(t){
   const homeQ=homeCityRaw?(homeCountry?`${homeCityRaw}, ${homeCountry}`:homeCityRaw):'';
 
   const typeIcon={attraction:'📍',restaurant:'🍽',shopping:'🛍',experience:'🎯'};
+  // Named transit hubs worth showing as their own map waypoint, keyed to an
+  // icon — checked against a "transport"-type activity's name, since the
+  // schema doesn't give transit stops their own type.
+  // Order matters: more specific patterns (bus/metro station) must be
+  // checked before the generic "station" catch-all so e.g. a bus station
+  // doesn't get the train icon.
+  const TRANSIT_KEYWORDS=[
+    {re:/\bairports?\b/i,icon:'✈'},
+    {re:/\bbus\s*(terminals?|stations?|stops?)\b/i,icon:'🚌'},
+    {re:/\bmetro\s*stations?\b/i,icon:'🚇'},
+    {re:/\b(jetty|jetties|ferry\s*terminals?|harbou?rs?|piers?|docks?)\b/i,icon:'⛴'},
+    {re:/\bports?\b/i,icon:'⚓'},
+    {re:/\bstations?\b/i,icon:'🚆'},
+  ];
+  function transitIcon(name){
+    for(const k of TRANSIT_KEYWORDS){if(k.re.test(name||''))return k.icon;}
+    return null;
+  }
   const days=[...(t.days||[])].sort((a,b)=>(a.dayNumber||0)-(b.dayNumber||0));
 
   // ── Overnight base city per day — NOT the same as day.city ─────────
@@ -4627,12 +4645,19 @@ function buildCityMaps(t){
         destLabel=nextHotel?nextHotel.name:nextBase;
       } else {destQ=hotelQ;destLabel=hotelLabel;}
 
-      // ── This day's attractions, in order, deduped ──
+      // ── This day's attractions, plus any named transit landmark, in order, deduped ──
+      // Most "transport"-type activities are just narration ("Drive to X",
+      // "Return to hotel") with no distinct place to show on the map — but a
+      // NAMED hub (airport, train station, jetty, port…) is a real waypoint
+      // travellers expect to see on the route, so those are kept while
+      // generic transfers are still skipped.
       const places=[];
       (day.activities||[]).forEach(act=>{
-        if(!['attraction','restaurant','shopping','experience'].includes(act.type))return;
+        const isPlaceType=['attraction','restaurant','shopping','experience'].includes(act.type);
+        const tIcon=isPlaceType?null:transitIcon(act.name);
+        if(!isPlaceType&&!tIcon)return;
         const name=cleanPlaceName(act.name);
-        if(name&&!places.find(p=>p.name===name))places.push({name,type:act.type||'attraction'});
+        if(name&&!places.find(p=>p.name===name))places.push({name,type:isPlaceType?(act.type||'attraction'):'transit',icon:tIcon});
       });
       const stopsForUrl=places.slice(0,6).map(p=>esc(qualify(p.name,city)));
 
@@ -4700,7 +4725,7 @@ function buildCityMaps(t){
         </div>
         <div class="wpts-row" style="flex-wrap:wrap">
           <div class="wpt" style="background:var(--gold-ll);border:1px solid var(--gold);font-weight:600">🏨 ${originLabel}</div>
-          ${places.map(p=>`<div class="wpt-seg">→</div><div class="wpt">${typeIcon[p.type]||'📍'} ${p.name}</div>`).join('')}
+          ${places.map(p=>`<div class="wpt-seg">→</div><div class="wpt">${p.icon||typeIcon[p.type]||'📍'} ${p.name}</div>`).join('')}
           <div class="wpt-seg">→</div><div class="wpt" style="background:#EAF4F0;border:1px solid var(--teal);font-size:.73rem">🏨 ${destLabel}</div>
         </div>
         ${_cityMapHtml}
