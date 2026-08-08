@@ -2892,7 +2892,9 @@ function renderItinerary(t){
 
 function buildMustSee(t){
   const panel=$('mustsee-panel');
-  const arr=t.mustSeeAttractions||[];
+  // Re-dedupe on every render, not just at generation/modify time — trips
+  // saved before that fix existed still have duplicate entries at rest.
+  const arr=t.mustSeeAttractions=dedupeHighlights(t.mustSeeAttractions);
   // Show/hide Highlights tab
   const emptyHL=$('empty-highlights'),contentHL=$('highlights-content');
   if(!arr.length){
