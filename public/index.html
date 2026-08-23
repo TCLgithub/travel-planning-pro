@@ -557,7 +557,7 @@ a{color:inherit;text-decoration:none}.muted{color:var(--ink-ll);font-size:.72rem
         <label>Model</label>
         <select id="model-anthropic" onchange="saveKey('anthropic')" style="margin-bottom:.45rem">
           <option value="claude-haiku-4-5">claude-haiku-4-5 (fast)</option>
-          <option value="claude-sonnet-4-5">claude-sonnet-4-5 (best)</option>
+          <option value="claude-sonnet-4-5" selected>claude-sonnet-4-5 (best)</option>
           <option value="claude-opus-4-5">claude-opus-4-5 (powerful)</option>
         </select>
         <div class="key-row"><label>API Key</label>
@@ -1814,7 +1814,7 @@ async function testAllAPIs(){
   const btn=$('test-apis-btn');const res=$('api-test-results');
   if(btn)btn.textContent='⏳ Testing…';
   if(res){res.style.display='block';res.innerHTML='Testing providers from your browser…';}
-  const DEFAULT_MODELS={gemini:'gemini-2.5-flash',deepseek:'deepseek-chat',anthropic:'claude-haiku-4-5',openai:'gpt-4o-mini'};
+  const DEFAULT_MODELS={gemini:'gemini-2.5-flash',deepseek:'deepseek-chat',anthropic:'claude-sonnet-4-5',openai:'gpt-4o-mini'};
   const lines=[];
   for(const p of PROVIDERS){
     const key=localStorage.getItem('tppK_'+p)||'';
@@ -2300,7 +2300,7 @@ async function callWithFallback(prompt,validate=null){
     const errors={};
     for(const p of PROVIDERS){
       const key=localStorage.getItem('tppK_'+p)||'';
-      const DEFAULT_MODELS={gemini:'gemini-2.5-flash',deepseek:'deepseek-chat',anthropic:'claude-haiku-4-5',openai:'gpt-4o-mini'};
+      const DEFAULT_MODELS={gemini:'gemini-2.5-flash',deepseek:'deepseek-chat',anthropic:'claude-sonnet-4-5',openai:'gpt-4o-mini'};
       const model=localStorage.getItem('tppM_'+p)||$('model-'+p)?.value||DEFAULT_MODELS[p]||'';
       // In Netlify mode, skip key check — proxy handles auth server-side
       if(!key&&!NETLIFY_MODE){fbEntry(p,'skip');errors[p]='no key';continue;}
@@ -2356,7 +2356,7 @@ async function callWithFallback(prompt,validate=null){
 
 // Silent AI call for secondary tasks (packing list, etc.) — no loading UI side-effects
 async function silentCallAI(prompt){
-  const DEFAULT_MODELS={gemini:'gemini-2.5-flash',deepseek:'deepseek-chat',anthropic:'claude-haiku-4-5',openai:'gpt-4o-mini'};
+  const DEFAULT_MODELS={gemini:'gemini-2.5-flash',deepseek:'deepseek-chat',anthropic:'claude-sonnet-4-5',openai:'gpt-4o-mini'};
   for(const p of PROVIDERS){
     const key=localStorage.getItem('tppK_'+p)||'';
     if(!key&&!NETLIFY_MODE)continue;
@@ -6222,10 +6222,17 @@ window.addEventListener('DOMContentLoaded',()=>{
   const _curGemini=localStorage.getItem('tppM_gemini');
   if(!_curGemini||_staleGemini.includes(_curGemini))
     localStorage.setItem('tppM_gemini','gemini-2.5-flash');
+  // claude-haiku-4-5 included here (not just the truly deprecated dated
+  // models) so anyone already defaulted onto it — from an earlier version
+  // of this same migration, or from having the model dropdown's old
+  // default value saved — moves to the new default too. Haiku's smaller
+  // size was linked to it dropping specific requirements from detailed,
+  // itemized itinerary instructions; Sonnet follows those far more reliably.
   const _staleAnthropic=['claude-3-5-haiku-20241022','claude-3-5-sonnet-20241022',
-                          'claude-3-haiku-20240307','claude-3-opus-20240229','claude-3-5-sonnet-20240620'];
+                          'claude-3-haiku-20240307','claude-3-opus-20240229','claude-3-5-sonnet-20240620',
+                          'claude-haiku-4-5'];
   if(_staleAnthropic.includes(localStorage.getItem('tppM_anthropic')))
-    localStorage.setItem('tppM_anthropic','claude-haiku-4-5');
+    localStorage.setItem('tppM_anthropic','claude-sonnet-4-5');
   if('gemini' in _k && _k.gemini==='') localStorage.removeItem('tppK_gemini');
   else if(_k.gemini && !localStorage.getItem('tppK_gemini')) localStorage.setItem('tppK_gemini', _k.gemini);
   if(_k.deepseek  && !localStorage.getItem('tppK_deepseek'))  localStorage.setItem('tppK_deepseek',  _k.deepseek);
