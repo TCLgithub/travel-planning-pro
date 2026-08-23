@@ -4974,15 +4974,16 @@ function toggleItinEdit(){
   if(btn){btn.textContent=itinEditMode?'✓ Done Editing':'📝 Edit Item by Item';btn.style.fontWeight=itinEditMode?'700':'';}
   const notice=$('edit-mode-notice');
   if(notice)notice.style.display=itinEditMode?'flex':'none';
-  // Show/hide add-activity buttons
-  document.querySelectorAll('.edit-add-act').forEach(b=>b.style.display=itinEditMode?'block':'none');
-  // Show/hide edit-act-bars (remove + move buttons)
-  document.querySelectorAll('.edit-act-bar').forEach(b=>b.style.display=itinEditMode?'flex':'none');
-  // Toggle contenteditable on all e-field elements
-  document.querySelectorAll('.e-field').forEach(el=>{
-    el.contentEditable=itinEditMode?'true':'false';
-    el.style.pointerEvents=itinEditMode?'':'none';
-  });
+  // Re-render the days with the new mode instead of toggling styles on
+  // existing elements — the per-activity Remove/Move toolbar (.edit-act-bar)
+  // and the editable name/time/description fields (.e-field) aren't just
+  // hidden when edit mode is off, buildDays() omits that markup from the
+  // HTML entirely. Toggling .style.display on a querySelectorAll of those
+  // classes found nothing the first time a trip's days were rendered
+  // outside edit mode, since the elements never existed — so turning edit
+  // mode on revealed "+ Add Activity" (always present, just display-toggled)
+  // but never revealed a way to remove or edit an existing activity.
+  buildDays(tripData,tripData._meta?.days||(tripData.days||[]).length);
   if(!itinEditMode) toast('✓ Changes saved');
 }
 
