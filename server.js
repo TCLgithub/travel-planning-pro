@@ -81,4 +81,19 @@ app.get('*', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Travel Planning Pro running on port ${PORT}`));
+const server = app.listen(PORT, () => console.log(`Travel Planning Pro running on port ${PORT}`));
+
+// Node's default keepAliveTimeout is only 5s — shorter than the idle-
+// connection timeout Render's own front-end proxy uses for its pooled
+// connections to this app. When a connection sits idle for longer than
+// Node's 5s but less than the proxy's own timeout, Node silently closes it
+// while the proxy still considers it reusable; the next request the proxy
+// sends over that connection lands on a half-dead socket and gets no HTTP
+// response at all — surfacing to the browser as a bare "Failed to fetch" /
+// net::ERR_CONNECTION_CLOSED with no status code, intermittently, under
+// completely normal traffic. Reproduced directly: rapid back-to-back
+// requests failed about 1 in 4 times with exactly this signature.
+// Raising Node's timeout comfortably above the proxy's removes the race.
+// (headersTimeout must exceed keepAliveTimeout or Node throws at startup.)
+server.keepAliveTimeout = 120000;
+server.headersTimeout = 125000;
