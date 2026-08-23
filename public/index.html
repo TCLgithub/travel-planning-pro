@@ -4214,8 +4214,39 @@ function _buildLeafletMap(containerId, places, hotelName, city, drawRoute){
   }
 }
 
+// Derive the real city-to-city route directly from the itinerary's own
+// day-by-day city sequence, rather than trusting the separately-generated
+// t.waypoints array. That array is authored once at generation time and
+// doesn't necessarily get regenerated when a later Modify Trip run changes
+// which cities are actually visited or in what order — so the map could
+// keep showing an old route (e.g. still looping back to a city the
+// itinerary no longer returns to) even though the days themselves are
+// correct. Day-trip excursions (a city visited for one day then returned
+// from, same base before and after) are collapsed into that base city,
+// matching how the daily route maps already treat them, so a day trip
+// doesn't show up here as a spurious relocation.
+function _deriveWaypointsFromDays(t){
+  const days=[...(t.days||[])].sort((a,b)=>(a.dayNumber||0)-(b.dayNumber||0));
+  if(!days.length)return null;
+  const normC=s=>(s||'').split(',')[0].trim().toLowerCase();
+  const baseCity=[];
+  for(let i=0;i<days.length;i++){
+    const city=(days[i].city||'').trim();
+    const prevBase=i>0?baseCity[i-1]:'';
+    const nextCity=(days[i+1]?.city||'').trim();
+    const isDayTrip=i>0&&i<days.length-1&&prevBase&&normC(city)!==normC(prevBase)&&nextCity&&normC(nextCity)===normC(prevBase);
+    baseCity.push(isDayTrip?prevBase:city);
+  }
+  const seq=[];
+  baseCity.forEach(c=>{
+    if(!c)return;
+    const last=seq[seq.length-1];
+    if(!last||normC(last)!==normC(c))seq.push(c);
+  });
+  return seq.length?seq:null;
+}
 function buildMap(t){
-  const rawWps=t.waypoints?.length?t.waypoints:(t.destinations||[t.destination||'']);
+  const rawWps=_deriveWaypointsFromDays(t)||(t.waypoints?.length?t.waypoints:(t.destinations||[t.destination||'']));
   const trans=t.transportSummary||[];
   const homeCity=(t._meta?.homeCity||'').toLowerCase().trim();
 
