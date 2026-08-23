@@ -1627,7 +1627,12 @@ function findDB(raw){
 
 // ══ STATE ══
 let tripData=null, loadTmr=null;
-const PROVIDERS=['gemini','deepseek','anthropic','openai'];
+// Claude tried first — user reported DeepSeek (reached when Gemini's own
+// attempts failed) silently dropping specific day-by-day requirements from
+// detailed instructions; Claude follows detailed structured instructions
+// more reliably in practice, so it's worth trying before falling back
+// toward DeepSeek.
+const PROVIDERS=['anthropic','gemini','deepseek','openai'];
 const P_LABELS={gemini:'🔵 Gemini',deepseek:'🟣 DeepSeek',anthropic:'🟠 Claude',openai:'🟢 OpenAI'};
 let destTimers={}, destSelected={};
 
@@ -2313,15 +2318,20 @@ async function callWithFallback(prompt,validate=null){
           return{text,provider:p,model};
         }catch(err){
           const isJsonErr=err.message.includes('No JSON')||err.message.includes('no usable')||err.message.includes('parse');
-          if(attempt<maxAttempts-1&&isJsonErr){
-            // Transient bad-format response — retry before giving up on this provider
+          // "Failed to fetch" is the browser's generic network-request failure
+          // (dropped connection, brief DNS hiccup, etc.) — often gone on an
+          // immediate retry, so treat it as transient like a format hiccup
+          // rather than giving up on this provider after a single blip.
+          const isNetworkErr=err.message.includes('Failed to fetch')||err.message.includes('NetworkError');
+          if(attempt<maxAttempts-1&&(isJsonErr||isNetworkErr)){
+            // Transient bad-format/network response — retry before giving up on this provider
             fbEntry(p,'trying');
             $('load-txt').textContent=`Retrying ${P_LABELS[p]} (${attempt+2}/${maxAttempts})…`;
             await new Promise(r=>setTimeout(r,900));
             continue;
           }
-          // Show "format issue" instead of raw "No JSON found" — less alarming, clearer intent
-          const dispErr=isJsonErr?'response format issue — trying next provider':err.message.slice(0,60);
+          // Show a friendlier label than the raw error — less alarming, clearer intent
+          const dispErr=isJsonErr?'response format issue — trying next provider':isNetworkErr?'network error — trying next provider':err.message.slice(0,60);
           fbEntry(p,'err',dispErr);
           errors[p]=dispErr;
           const dot=$('adot-'+p);if(dot)dot.className='api-dot err';
