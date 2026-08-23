@@ -2182,11 +2182,20 @@ async function _proxyErrMsg(r,prefix){
   catch(_){return prefix+' '+r.status;}
 }
 async function callGemini(p,key,model){
+  // 2.5-series models "think" before answering by default — measured at
+  // 400+ hidden thinking tokens even for a one-word reply, and tens of
+  // seconds of added latency on a real itinerary chunk. That's pure
+  // overhead for a structured JSON-generation task with no need for
+  // step-by-step reasoning, and it's what was pushing chunk generation
+  // past Cloudflare/Render's request timeout (seen as 502/504s on every
+  // provider at once — Gemini's slow response was likely stalling the
+  // whole request pipeline). Disabling it removes that latency outright.
+  const _genCfg=cfg=>(/2\.5/.test(model||'')?{...cfg,thinkingConfig:{thinkingBudget:0}}:cfg);
   if(NETLIFY_MODE){
     // Route through Netlify function — key stays server-side
     const r=await fetch('/api/gemini',{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model,contents:[{parts:[{text:p}]}],generationConfig:{temperature:0.4,maxOutputTokens:8000}})
+      body:JSON.stringify({model,contents:[{parts:[{text:p}]}],generationConfig:_genCfg({temperature:0.4,maxOutputTokens:8000})})
     });
     if(!r.ok){throw new Error(await _proxyErrMsg(r,'Proxy HTTP'));}
     const d=await r.json();if(d.error)throw new Error(d.error.message);
@@ -2195,7 +2204,7 @@ async function callGemini(p,key,model){
   if(!key)throw new Error('No Gemini API key');
   const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
     {method:'POST',headers:{'Content-Type':'application/json'},
-     body:JSON.stringify({contents:[{parts:[{text:p}]}],generationConfig:{temperature:0.4,maxOutputTokens:16384}})});
+     body:JSON.stringify({contents:[{parts:[{text:p}]}],generationConfig:_genCfg({temperature:0.4,maxOutputTokens:16384})})});
   if(!r.ok){throw new Error(await _proxyErrMsg(r,'HTTP'));}
   const d=await r.json();if(d.error)throw new Error(d.error.message);
   const t=d.candidates?.[0]?.content?.parts?.[0]?.text||'';if(!t)throw new Error('Empty response');return t;
@@ -2271,49 +2280,68 @@ function fbEntry(p,state,err=''){
 }
 
 async function callWithFallback(prompt,validate=null){
-  $('fb-log').style.display='block';$('fb-entries').innerHTML='';
-  const errors={};
-  for(const p of PROVIDERS){
-    const key=localStorage.getItem('tppK_'+p)||'';
-    const DEFAULT_MODELS={gemini:'gemini-2.5-flash',deepseek:'deepseek-chat',anthropic:'claude-haiku-4-5',openai:'gpt-4o-mini'};
-    const model=localStorage.getItem('tppM_'+p)||$('model-'+p)?.value||DEFAULT_MODELS[p]||'';
-    // In Netlify mode, skip key check — proxy handles auth server-side
-    if(!key&&!NETLIFY_MODE){fbEntry(p,'skip');errors[p]='no key';continue;}
-    fbEntry(p,'trying');
-    $('load-txt').textContent='Trying '+P_LABELS[p]+(NETLIFY_MODE?' (via proxy)':'')+'…';
-    // Retry up to 3× within same provider for JSON validation failures (Gemini occasionally
-    // prepends preamble text or omits the closing brace on large responses)
-    const maxAttempts=p==='gemini'?3:2;
-    for(let attempt=0;attempt<maxAttempts;attempt++){
-      try{
-        const text=await CALL[p](prompt,key,model);
-        if(validate)validate(text);
-        fbEntry(p,'ok');
-        const dot=$('adot-'+p);if(dot)dot.className='api-dot ok';
-        return{text,provider:p,model};
-      }catch(err){
-        const isJsonErr=err.message.includes('No JSON')||err.message.includes('no usable')||err.message.includes('parse');
-        if(attempt<maxAttempts-1&&isJsonErr){
-          // Transient bad-format response — retry before giving up on this provider
-          fbEntry(p,'trying');
-          $('load-txt').textContent=`Retrying ${P_LABELS[p]} (${attempt+2}/${maxAttempts})…`;
-          await new Promise(r=>setTimeout(r,900));
-          continue;
+  $('fb-log').style.display='block';
+  // 502/503/504 are gateway/timeout errors, not a per-provider content
+  // problem — e.g. a slow generation stalling the request past Cloudflare/
+  // Render's own timeout hits EVERY provider the same way, since they all
+  // go through the same request pipeline. Falling through providers is the
+  // right first move (below), but if literally all of them come back with
+  // this same gateway signature, that's a strong signal the whole pass hit
+  // a transient platform hiccup rather than any real per-provider fault —
+  // worth one full retry before surfacing a scary "all providers failed".
+  const isGatewayErr=msg=>/HTTP 50[0234]\b/.test(msg||'');
+  for(let pass=0;pass<2;pass++){
+    $('fb-entries').innerHTML='';
+    const errors={};
+    for(const p of PROVIDERS){
+      const key=localStorage.getItem('tppK_'+p)||'';
+      const DEFAULT_MODELS={gemini:'gemini-2.5-flash',deepseek:'deepseek-chat',anthropic:'claude-haiku-4-5',openai:'gpt-4o-mini'};
+      const model=localStorage.getItem('tppM_'+p)||$('model-'+p)?.value||DEFAULT_MODELS[p]||'';
+      // In Netlify mode, skip key check — proxy handles auth server-side
+      if(!key&&!NETLIFY_MODE){fbEntry(p,'skip');errors[p]='no key';continue;}
+      fbEntry(p,'trying');
+      $('load-txt').textContent='Trying '+P_LABELS[p]+(NETLIFY_MODE?' (via proxy)':'')+'…';
+      // Retry up to 3× within same provider for JSON validation failures (Gemini occasionally
+      // prepends preamble text or omits the closing brace on large responses)
+      const maxAttempts=p==='gemini'?3:2;
+      for(let attempt=0;attempt<maxAttempts;attempt++){
+        try{
+          const text=await CALL[p](prompt,key,model);
+          if(validate)validate(text);
+          fbEntry(p,'ok');
+          const dot=$('adot-'+p);if(dot)dot.className='api-dot ok';
+          return{text,provider:p,model};
+        }catch(err){
+          const isJsonErr=err.message.includes('No JSON')||err.message.includes('no usable')||err.message.includes('parse');
+          if(attempt<maxAttempts-1&&isJsonErr){
+            // Transient bad-format response — retry before giving up on this provider
+            fbEntry(p,'trying');
+            $('load-txt').textContent=`Retrying ${P_LABELS[p]} (${attempt+2}/${maxAttempts})…`;
+            await new Promise(r=>setTimeout(r,900));
+            continue;
+          }
+          // Show "format issue" instead of raw "No JSON found" — less alarming, clearer intent
+          const dispErr=isJsonErr?'response format issue — trying next provider':err.message.slice(0,60);
+          fbEntry(p,'err',dispErr);
+          errors[p]=dispErr;
+          const dot=$('adot-'+p);if(dot)dot.className='api-dot err';
+          if(PROVIDERS.filter(q=>localStorage.getItem('tppK_'+q)||NETLIFY_MODE).length>1)
+            toast('⚠ '+P_LABELS[p]+' retried — trying next…',2000);
+          break;
         }
-        // Show "format issue" instead of raw "No JSON found" — less alarming, clearer intent
-        const dispErr=isJsonErr?'response format issue — trying next provider':err.message.slice(0,60);
-        fbEntry(p,'err',dispErr);
-        errors[p]=dispErr;
-        const dot=$('adot-'+p);if(dot)dot.className='api-dot err';
-        if(PROVIDERS.filter(q=>localStorage.getItem('tppK_'+q)||NETLIFY_MODE).length>1)
-          toast('⚠ '+P_LABELS[p]+' retried — trying next…',2000);
-        break;
       }
     }
+    const attempted=PROVIDERS.filter(p=>errors[p]&&errors[p]!=='no key');
+    if(pass===0&&attempted.length&&attempted.every(p=>isGatewayErr(errors[p]))){
+      $('load-txt').textContent='⏳ Gateway timeout on every provider — retrying once more…';
+      toast('⚠ Gateway timeout on all providers — retrying…',3500);
+      await new Promise(r=>setTimeout(r,4000));
+      continue;
+    }
+    const detail=attempted.map(p=>`${P_LABELS[p]}: ${errors[p]}`).join(' | ');
+    const hint=NETLIFY_MODE?' Check server environment variables in Render dashboard.':' Check API keys in ⚙ Settings.';
+    throw new Error('All providers failed.'+(detail?' ('+detail+')':hint));
   }
-  const detail=PROVIDERS.filter(p=>errors[p]&&errors[p]!=='no key').map(p=>`${P_LABELS[p]}: ${errors[p]}`).join(' | ');
-  const hint=NETLIFY_MODE?' Check server environment variables in Render dashboard.':' Check API keys in ⚙ Settings.';
-  throw new Error('All providers failed.'+(detail?' ('+detail+')':hint));
 }
 
 // Silent AI call for secondary tasks (packing list, etc.) — no loading UI side-effects
