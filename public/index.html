@@ -2171,6 +2171,16 @@ const NETLIFY_MODE=(()=>{
   return false;
 })();
 
+// A failed proxy/API call is expected to return a JSON error body, but
+// during a brief server restart or platform outage the response can be an
+// HTML gateway error page instead (e.g. Render/Cloudflare's own 502 page).
+// r.json() on that throws its own confusing "Unexpected token '<'" parse
+// error, masking the real (and much more actionable) HTTP status — so the
+// JSON parse is guarded and falls back to a plain status-code message.
+async function _proxyErrMsg(r,prefix){
+  try{const e=await r.json();return e.error?.message||prefix+' '+r.status;}
+  catch(_){return prefix+' '+r.status;}
+}
 async function callGemini(p,key,model){
   if(NETLIFY_MODE){
     // Route through Netlify function — key stays server-side
@@ -2178,7 +2188,7 @@ async function callGemini(p,key,model){
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model,contents:[{parts:[{text:p}]}],generationConfig:{temperature:0.4,maxOutputTokens:8000}})
     });
-    if(!r.ok){const e=await r.json();throw new Error(e.error?.message||'Proxy HTTP '+r.status);}
+    if(!r.ok){throw new Error(await _proxyErrMsg(r,'Proxy HTTP'));}
     const d=await r.json();if(d.error)throw new Error(d.error.message);
     const t=d.candidates?.[0]?.content?.parts?.[0]?.text||'';if(!t)throw new Error('Empty response');return t;
   }
@@ -2186,7 +2196,7 @@ async function callGemini(p,key,model){
   const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
     {method:'POST',headers:{'Content-Type':'application/json'},
      body:JSON.stringify({contents:[{parts:[{text:p}]}],generationConfig:{temperature:0.4,maxOutputTokens:16384}})});
-  if(!r.ok){const e=await r.json();throw new Error(e.error?.message||'HTTP '+r.status);}
+  if(!r.ok){throw new Error(await _proxyErrMsg(r,'HTTP'));}
   const d=await r.json();if(d.error)throw new Error(d.error.message);
   const t=d.candidates?.[0]?.content?.parts?.[0]?.text||'';if(!t)throw new Error('Empty response');return t;
 }
@@ -2196,7 +2206,7 @@ async function callDeepSeek(p,key,model){
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model,messages:[{role:'user',content:p}],max_tokens:8000,temperature:0.4})
     });
-    if(!r.ok){const e=await r.json();throw new Error(e.error?.message||'Proxy HTTP '+r.status);}
+    if(!r.ok){throw new Error(await _proxyErrMsg(r,'Proxy HTTP'));}
     const d=await r.json();if(d.error)throw new Error(d.error.message);
     const t=d.choices?.[0]?.message?.content||'';if(!t)throw new Error('Empty response');return t;
   }
@@ -2204,7 +2214,7 @@ async function callDeepSeek(p,key,model){
   const r=await fetch('https://api.deepseek.com/v1/chat/completions',
     {method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
      body:JSON.stringify({model,messages:[{role:'user',content:p}],max_tokens:16000,temperature:0.4})});
-  if(!r.ok){const e=await r.json();throw new Error(e.error?.message||'HTTP '+r.status);}
+  if(!r.ok){throw new Error(await _proxyErrMsg(r,'HTTP'));}
   const d=await r.json();if(d.error)throw new Error(d.error.message);
   const t=d.choices?.[0]?.message?.content||'';if(!t)throw new Error('Empty response');return t;
 }
@@ -2214,7 +2224,7 @@ async function callAnthropic(p,key,model){
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model,max_tokens:8000,messages:[{role:'user',content:p}]})
     });
-    if(!r.ok){const e=await r.json();throw new Error(e.error?.message||'Proxy HTTP '+r.status);}
+    if(!r.ok){throw new Error(await _proxyErrMsg(r,'Proxy HTTP'));}
     const d=await r.json();if(d.error)throw new Error(d.error.message);
     const t=d.content?.[0]?.text||'';if(!t)throw new Error('Empty response');return t;
   }
@@ -2222,7 +2232,7 @@ async function callAnthropic(p,key,model){
   const r=await fetch('https://api.anthropic.com/v1/messages',
     {method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
      body:JSON.stringify({model,max_tokens:16000,messages:[{role:'user',content:p}]})});
-  if(!r.ok){const e=await r.json();throw new Error(e.error?.message||'HTTP '+r.status);}
+  if(!r.ok){throw new Error(await _proxyErrMsg(r,'HTTP'));}
   const d=await r.json();if(d.error)throw new Error(d.error.message);
   const t=d.content?.[0]?.text||'';if(!t)throw new Error('Empty response');return t;
 }
@@ -2232,7 +2242,7 @@ async function callOpenAI(p,key,model){
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model,messages:[{role:'user',content:p}],max_tokens:8000,temperature:0.4})
     });
-    if(!r.ok){const e=await r.json();throw new Error(e.error?.message||'Proxy HTTP '+r.status);}
+    if(!r.ok){throw new Error(await _proxyErrMsg(r,'Proxy HTTP'));}
     const d=await r.json();if(d.error)throw new Error(d.error.message);
     const t=d.choices?.[0]?.message?.content||'';if(!t)throw new Error('Empty response');return t;
   }
@@ -2240,7 +2250,7 @@ async function callOpenAI(p,key,model){
   const r=await fetch('https://api.openai.com/v1/chat/completions',
     {method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
      body:JSON.stringify({model,messages:[{role:'user',content:p}],max_tokens:16000,temperature:0.4})});
-  if(!r.ok){const e=await r.json();throw new Error(e.error?.message||'HTTP '+r.status);}
+  if(!r.ok){throw new Error(await _proxyErrMsg(r,'HTTP'));}
   const d=await r.json();if(d.error)throw new Error(d.error.message);
   const t=d.choices?.[0]?.message?.content||'';if(!t)throw new Error('Empty response');return t;
 }
