@@ -2874,7 +2874,7 @@ async function generateGuideAndBudget(t){
 
 TRIP: ${destStr} | ${m.days} days | From: ${m.homeCity||'KL'} (${m.flightClass||'Economy'}) | Travellers: ${m.travellers||'2 adults'} | Budget: ${m.budget||'Mid-range'} | Style: ${m.style||'Cultural'} | Transport: ${m.transport||'Taxi'} | Food: ${m.food||'Local cuisine'} | Diet: ${m.diet||'No restrictions'}
 
-IMPORTANT for currency in localGuide: show the local currency name and the conversion rate TO MYR (Malaysian Ringgit). Format: "1 [local currency] ≈ X.XX MYR".${(()=>{const lr=window._liveRatesMYR;if(!lr)return'';const codes=Object.keys(lr).filter(c=>['CAD','USD','EUR','GBP','AUD','NZD','JPY','CNY','TWD','KRW','THB','SGD','HKD','AED','INR','IDR','PHP','VND'].includes(c));if(!codes.length)return'';return' Use these LIVE rates (fetched today): '+codes.map(c=>`1 ${c} = ${lr[c].toFixed(4)} MYR`).join(', ')+'.';})()} Include the digital/electronic arrival card or eTA URL if required for Malaysians entering ${destStr}.
+IMPORTANT for currency in localGuide: show the local currency name and the conversion rate TO MYR (Malaysian Ringgit). Format: "1 [local currency] ≈ X.XX MYR".${(()=>{const lr=window._liveRatesMYR;if(!lr)return'';const codes=Object.keys(lr).filter(c=>['CAD','USD','EUR','GBP','AUD','NZD','JPY','CNY','TWD','KRW','THB','SGD','HKD','AED','INR','IDR','PHP','VND'].includes(c));if(!codes.length)return'';return' Use these LIVE rates (fetched today): '+codes.map(c=>`1 ${c} = ${lr[c].toFixed(4)} MYR`).join(', ')+'.';})()} In entryRequirements, include EACH of these as its own entry with a "url" to the official government page, whenever it applies to Malaysians entering ${destStr} (omit any that genuinely don't apply — don't invent one that doesn't exist): (1) digital/electronic arrival card or eTA, (2) health declaration form (some destinations still require one, most post-COVID no longer do — check before including).
 
 IMPORTANT for highLevelBudget: ALL amounts MUST be in MYR (Malaysian Ringgit). Set "currency":"MYR". Do NOT use local currency amounts. Use realistic MYR amounts for a Malaysian traveller.
 
@@ -2884,7 +2884,8 @@ Return ONLY valid JSON — no markdown, no code fences, nothing outside JSON:
     "destination":"${destStr}",
     "entryRequirements":[
       {"item":"Passport","detail":"Valid 6+ months from entry date"},
-      {"item":"eTA / Arrival Card","detail":"Required — apply online before travel","url":"https://www.example.gov/eta-apply"}
+      {"item":"Digital Arrival Card / eTA","detail":"Required — apply online before travel","url":"https://www.example.gov/arrival-card"},
+      {"item":"Health Declaration","detail":"Only include this entry if the destination genuinely still requires one — omit entirely otherwise","url":"https://www.example.gov/health-declaration"}
     ],
     "currency":{"local":"TWD — New Taiwan Dollar","rate":"1 TWD ≈ 0.14 MYR","cashTip":"Cards accepted widely; carry NTD cash for night markets and small vendors"},
     "localTransport":[{"type":"MRT/Metro","tip":"Get a reloadable transit card (e.g. EasyCard / Octopus / T-money)","cost":"varies by distance"}],
@@ -4754,7 +4755,22 @@ function buildCityMaps(t){
       found=matchHotelInText(act.name);
       if(found)break;
     }
-    dayHotel.push(found||(i>0?dayHotel[i-1]:findHotelForCity(baseCity[0]))||null);
+    if(found){
+      dayHotel.push(found);
+    } else if(i>0&&normCity(baseCity[i])===normCity(baseCity[i-1])){
+      // No check-in mentioned, but the base city didn't change per the
+      // city-label comparison above — still the same hotel, carry it forward.
+      dayHotel.push(dayHotel[i-1]);
+    } else {
+      // Base city DID change (or this is day 1) but no check-in was found
+      // for the new city (e.g. different phrasing than "check-in at…") —
+      // don't blindly keep yesterday's hotel just because nothing new was
+      // detected. Re-resolve from today's own city instead; carrying the
+      // old hotel forward here is exactly what made the daily maps keep
+      // showing a return to the previous city's hotel long after the trip
+      // had actually moved on.
+      dayHotel.push(findHotelForCity(baseCity[i]));
+    }
   }
 
   const cards=days.map((day,i)=>{
