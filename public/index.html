@@ -8027,6 +8027,18 @@ function exportAllToGCal(){
   const tz=tripData.timezone||'Asia/Kuala_Lumpur';
   const vEvents=[];
 
+  // Must-see Highlights carry a much richer, AI-written description (and an
+  // insider tip) than the one-sentence description an itinerary activity
+  // gets — match them by cleaned name so an exported activity that's also a
+  // Highlight uses that fuller description instead of the terse one, rather
+  // than exporting the same place twice with two different descriptions.
+  const highlightByName={};
+  (tripData.mustSeeAttractions||[]).forEach(h=>{
+    const key=cleanPlaceName(h.name||'').toLowerCase();
+    if(key)highlightByName[key]=h;
+  });
+  const matchedHighlightKeys=new Set();
+
   // ── 1. Every activity on every day (ALL types: attraction, restaurant,
   //       transport, hotel check-in, experience, shopping, airport, jetty…) ──
   (tripData.days||[]).forEach(day=>{
@@ -8043,8 +8055,12 @@ function exportAllToGCal(){
       try{loc=new URL(a.googleMapsUrl||'').searchParams.get('query')||'';}catch(e){}
       if(!loc) loc=[a.name,day.city].filter(Boolean).join(', ');
 
+      const _hlKey=cleanPlaceName(a.name||'').toLowerCase();
+      const hl=highlightByName[_hlKey];
+      if(hl)matchedHighlightKeys.add(_hlKey); // so the Highlights-only pass below skips it
       const desc=[
-        a.description||'',
+        hl?.description||a.description||'',
+        hl?.insiderTip?`💡 Tip: ${hl.insiderTip}`:'',
         a.transport?`Getting there: ${a.transport}`:'',
         a.estimatedCost?`Cost: ${a.estimatedCost}`:'',
         a.duration?`Duration: ${a.duration}`:'',
@@ -8057,6 +8073,33 @@ function exportAllToGCal(){
         startDT, endDT, desc, loc
       ));
     });
+  });
+
+  // ── 1b. Any Highlight not already matched to a day activity above — so
+  //        nothing shown in the Highlights tab is silently left out of a
+  //        full trip export ──
+  (tripData.mustSeeAttractions||[]).forEach(hl=>{
+    const key=cleanPlaceName(hl.name||'').toLowerCase();
+    if(!key||matchedHighlightKeys.has(key))return;
+    const hlDate=hl.date||_addDays(meta.start,(hl.dayNumber||1)-1);
+    const startTime='10:00';
+    const startDT=_gcalDT(hlDate,startTime);
+    const endDT=_gcalDT(hlDate,_addMins(startTime,_parseDurMins(hl.duration)||90));
+    let loc='';
+    try{loc=new URL(hl.googleMapsUrl||'').searchParams.get('query')||'';}catch(e){}
+    if(!loc) loc=[hl.name,hl.city].filter(Boolean).join(', ');
+    const desc=[
+      hl.description||'',
+      hl.insiderTip?`💡 Tip: ${hl.insiderTip}`:'',
+      hl.ticketPrice?`🎫 Tickets: ${hl.ticketPrice}`:'',
+      hl.openingHours?`🕐 Hours: ${hl.openingHours}`:'',
+      hl.estimatedCost?`💰 ${hl.estimatedCost}`:'',
+      hl.bookingUrl?`Book: ${hl.bookingUrl}`:''
+    ].filter(Boolean).join('\n');
+    vEvents.push(_vEvent(
+      `${hl.emoji||'🏛'} ${hl.name||'Highlight'}${hl.dayNumber?' — Day '+hl.dayNumber:''}`,
+      startDT, endDT, desc, loc
+    ));
   });
 
   // ── 2. Inter-city transport segments (flights, drives, ferries, jetty…) ──
