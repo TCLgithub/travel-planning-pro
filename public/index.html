@@ -4799,38 +4799,43 @@ function buildCityMaps(t){
       const hotelLabel=h?h.name:(todayBase||city||'destination');
 
       const prevBase=(i>0?baseCity[i-1]:'').trim();
-      const nextBase=(i<days.length-1?baseCity[i+1]:'').trim();
-      const prevHotelObj=i>0?dayHotel[i-1]:null;
-      const nextHotelObj=i<days.length-1?dayHotel[i+1]:null;
       const isFirstDay=i===0;
       const isLastDay=i===days.length-1;
 
-      // Prefer comparing resolved hotel objects (reliable); fall back to
-      // the city-string comparison only when a hotel can't be resolved on
-      // both sides of the comparison.
-      const relocatedFromPrev=!isFirstDay&&(h&&prevHotelObj?h!==prevHotelObj:!!(prevBase&&normCity(prevBase)!==normCity(todayBase)));
-      const relocatingToNext=!isLastDay&&(h&&nextHotelObj?h!==nextHotelObj:!!(nextBase&&normCity(nextBase)!==normCity(todayBase)));
+      // dayHotel[i] is "the hotel you sleep at after day i's activities" —
+      // resolved from day i's OWN check-in if it has one, else carried
+      // forward/re-resolved as computed above. That makes today's
+      // destination simply today's own resolved hotel (h/hotelQ below —
+      // already correct on its own), and today's ORIGIN simply YESTERDAY's
+      // resolved hotel — no in-between comparison needed. The previous
+      // version instead compared today's hotel against TOMORROW's, which
+      // wrongly flagged a plain day (no transfer at all, e.g. a full day
+      // still in Suzhou) as "relocating" whenever the FOLLOWING day
+      // happened to check into somewhere new later that same day —
+      // showing tomorrow's hotel as today's destination even though today
+      // never moves; the actual transfer belongs entirely to that next
+      // day, which already computes its own correct origin/destination.
+      const prevHotel=i>0?(dayHotel[i-1]||findHotelForCity(prevBase)):null;
 
-      // ── Origin: home city (day 1, if known), previous night's hotel (a
-      // genuine overnight relocation happened), or today's own hotel
-      // (staying put, including day-trip days which share last night's base) ──
+      // ── Origin: home city (day 1, if known), yesterday's resolved hotel,
+      // or today's own hotel (staying put, including day-trip days which
+      // share last night's base) ──
       let originQ, originLabel;
       if(isFirstDay&&homeQ){originQ=homeQ;originLabel=homeCityRaw;}
-      else if(relocatedFromPrev){
-        const prevHotel=prevHotelObj||findHotelForCity(prevBase);
-        originQ=prevHotel?qualify(prevHotel.name,prevHotel.city||prevBase):qualify(prevBase,prevBase);
-        originLabel=prevHotel?prevHotel.name:prevBase;
+      else if(prevHotel){
+        originQ=qualify(prevHotel.name,prevHotel.city||prevBase);
+        originLabel=prevHotel.name;
+      } else if(!isFirstDay&&prevBase){
+        originQ=qualify(prevBase,prevBase);
+        originLabel=prevBase;
       } else {originQ=hotelQ;originLabel=hotelLabel;}
 
-      // ── Destination: home city (last day, if known), next night's hotel
-      // (relocating today), or today's own hotel (staying put) ──
+      // ── Destination: home city (last day, if known), else today's own
+      // resolved hotel — the night's actual end point, whether today
+      // stayed put or is itself the day that checks into somewhere new ──
       let destQ, destLabel;
       if(isLastDay&&homeQ){destQ=homeQ;destLabel=homeCityRaw;}
-      else if(relocatingToNext){
-        const nextHotel=nextHotelObj||findHotelForCity(nextBase);
-        destQ=nextHotel?qualify(nextHotel.name,nextHotel.city||nextBase):qualify(nextBase,nextBase);
-        destLabel=nextHotel?nextHotel.name:nextBase;
-      } else {destQ=hotelQ;destLabel=hotelLabel;}
+      else {destQ=hotelQ;destLabel=hotelLabel;}
 
       // ── This day's attractions, plus any named transit landmark, in order, deduped ──
       // Most "transport"-type activities are just narration ("Drive to X",
