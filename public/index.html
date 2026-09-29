@@ -2793,7 +2793,8 @@ CHUNK INSTRUCTION: This trip is ${days} days. Generate ONLY days 1–${chunk1End
 TRIP: ${destStr} | ${start}→${end} | ${travellers} | Budget: ${budget} | Style: ${style} | Pace: ${pace} | Transport: ${transport} | Diet: ${diet} | Food: ${food}${nightsStr?`\n${nightsStr}`:''}
 Hotels: ${hotelCtx}
 Cities covered so far, in order: ${citySummary}
-Already used (do NOT repeat these, and do NOT revisit an earlier city to redo the same sights — only backtrack if the route genuinely requires passing through it again): ${usedNames.join(', ')||'(none yet)'}
+Already used (do NOT repeat these, and do NOT revisit an earlier city to redo the same sights): ${usedNames.join(', ')||'(none yet)'}
+Do NOT backtrack to an earlier city — including for the final departure — unless the trip's own requirements above call for revisiting it. The trip does not need to return to the original arrival city; an "open-jaw" route (arrive one city, depart another) is valid whenever the destinations/special requirements imply one.
 Previous day ended in: ${prevCity}
 
 Generate ONLY days ${from} through ${to}. Day ${from} date = ${dateOfDay(from)}, Day ${to} date = ${dateOfDay(to)}.
@@ -8522,7 +8523,7 @@ CURRENT ITINERARY (day summaries):
 ${dayCtx}
 
 INSTRUCTIONS:
-- Apply ONLY the requested modification. Keep everything else as-is.
+- Apply ONLY the requested modification. Keep everything else as-is — EXCEPT when the modification itself specifies a route, a city order, or where the trip starts/ends: that is authoritative and overrides the current structure entirely. Do not preserve any part of the existing day sequence that contradicts it, and do not reintroduce or backtrack to a city the new route has left behind unless the request explicitly says to revisit it — even if that means the trip is "open-jaw" (arriving via one city and departing from a different one). A round trip does NOT have to return to the original arrival city.
 - Renumber dayNumber sequentially 1–${totalDays}. Recalculate dates from ${meta.start}.
 - Update hotels/transportSummary/waypoints only if the modification requires it.
 - Within each day, arrange activities in a logical geographic order to minimise unnecessary travel — group nearby stops together, do not backtrack (e.g. do not go toward one area, detour elsewhere, then double back).
@@ -8612,7 +8613,8 @@ ${headerSchema}`;
 Modification applied: "${instruction}"
 Hotels: ${JSON.stringify(ctxObj.hotels)}
 Cities covered so far, in order: ${citySummaryMod}
-Already used (do NOT repeat these, and do NOT revisit an earlier city to redo the same sights — only backtrack if the route genuinely requires passing through it again): ${usedNamesMod.join(', ')||'(none yet)'}
+Already used (do NOT repeat these, and do NOT revisit an earlier city to redo the same sights): ${usedNamesMod.join(', ')||'(none yet)'}
+Do NOT backtrack to an earlier city — including for the final departure — unless the modification above explicitly asks for that city to be revisited. If the modification specifies where the trip should end, that city is the departure point; the trip does not need to return to the original arrival city (an "open-jaw" route — arrive one city, depart another — is valid and expected here).
 Previous day ended in: ${prevCity}
 Generate ONLY days ${from} through ${to}. Day ${from} date = ${dateOfMod(from)}, Day ${to} date = ${dateOfMod(to)}.
 Within each day, arrange activities in a logical geographic order — group nearby stops together, do not backtrack.
