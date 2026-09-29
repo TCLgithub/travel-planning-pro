@@ -4740,18 +4740,31 @@ function buildCityMaps(t){
   // one; the city-string logic above is only the fallback when no hotel
   // can be matched at all (e.g. trips generated without a hotels array).
   function matchHotelInText(text){
-    const m=(text||'').match(/check.?[- ]?in\s*(?:at|to)?\s*(.+)/i);
-    if(!m)return null;
-    const raw=m[1].toLowerCase().trim();
+    // Real AI output uses BOTH word orders for a hotel check-in — "Check-in
+    // at Niccolo Suzhou" as well as "Niccolo Suzhou Check-in" (hotel name
+    // first). Capturing only the text AFTER "check-in" (the previous
+    // approach) silently failed to match the second form at all — nothing
+    // follows "Check-in" when it's the last word — which meant a real
+    // hotel transition went undetected and the day fell back to a stale
+    // earlier hotel instead. Checking for "check-in" and the hotel's full
+    // name ANYWHERE in the text, independent of order, catches both.
+    const raw=(text||'').toLowerCase();
+    if(!/check.?[- ]?in/i.test(raw))return null;
     return (t.hotels||[]).find(hh=>{
       const hn=(hh.name||'').toLowerCase().trim();
-      return hn&&(raw.includes(hn)||hn.includes(raw));
+      return hn&&hn.length>=6&&raw.includes(hn);
     })||null;
   }
   const dayHotel=[];
   for(let i=0;i<days.length;i++){
     let found=null;
     for(const act of(days[i].activities||[])){
+      // "Check-in" can also mean a train/flight check-in for an upcoming or
+      // past leg (e.g. "Check-in at Hongqiao Station for Shanghai") — that
+      // can name a DIFFERENT city's hotel by loose text match even though
+      // it has nothing to do with tonight's hotel. Only actual accommodation
+      // activities should resolve tonight's hotel.
+      if(act.type==='transport')continue;
       found=matchHotelInText(act.name);
       if(found)break;
     }
