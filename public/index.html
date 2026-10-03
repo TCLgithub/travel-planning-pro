@@ -4270,10 +4270,18 @@ function buildMap(t){
   // and airport-transfer legs entirely
   const destKeys=new Set(wps.map(w=>w.split(',')[0].toLowerCase().trim()));
   const destTrans=trans.filter(s=>{
-    const fk=(s.from||'').split(',')[0].toLowerCase().trim();
-    const tk=(s.to||'').split(',')[0].toLowerCase().trim();
-    // Must start AND end within destination cities (no airports, no home city)
-    return destKeys.has(fk)&&destKeys.has(tk)&&!isAirport(s.from||'')&&!isAirport(s.to||'');
+    // A transport leg's endpoint often names the specific airport too, e.g.
+    // "Seoul (Gimpo)" rather than bare "Seoul" (common for cities with
+    // multiple airports) — exact equality against the bare waypoint name
+    // missed these entirely, which then dropped the leg's flight/ground
+    // classification altogether and could wrongly route a flight-only
+    // connection (e.g. Seoul–Jeju, an island with no driving route) as if
+    // it were a normal drivable leg. Check containment instead.
+    const fk=(s.from||'').toLowerCase().trim();
+    const tk=(s.to||'').toLowerCase().trim();
+    const fMatch=[...destKeys].some(k=>fk.includes(k));
+    const tMatch=[...destKeys].some(k=>tk.includes(k));
+    return fMatch&&tMatch&&!isAirport(s.from||'')&&!isAirport(s.to||'');
   });
 
   // Match a segment to a consecutive waypoint pair by city name
@@ -4299,7 +4307,13 @@ function buildMap(t){
   }
   // Keep only destination waypoints connected by ground, preserving order
   const groundWps=wps.filter(w=>groundCities.has(w));
-  const mapWps=groundWps.length>=2?groundWps:wps;
+  // Falling back to ALL destinations when there's no 2+ ground-connected
+  // route only makes sense when we have no transport data to go on at all.
+  // When every leg WAS classified and they're all flights (e.g. Seoul to
+  // Jeju, an island with no driving route), that fallback used to force a
+  // same nonsensical driving-directions route anyway — forcing it here
+  // instead correctly falls through to the single-city search map below.
+  const mapWps=groundWps.length>=2?groundWps:(flightSegs.length||groundSegs.length?[]:wps);
 
   // Country name to disambiguate bare waypoints for geocoding (e.g. "Nusajaya"
   // alone can be mis-geocoded to the far more prominent "Nusa Dua, Bali"
