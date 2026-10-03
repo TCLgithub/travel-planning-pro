@@ -2663,7 +2663,7 @@ CITIES: This trip covers ${dests.length} ${dests.length===1?'city':'cities'}: ${
 ITINERARY OPTIMISATION — follow these rules for every day:
 1. GEOGRAPHIC SEQUENCING: Arrange attractions in a logical geographic order to minimise unnecessary travel. Group nearby attractions together. Avoid backtracking (e.g. do not go north then south then north again).
 2. NO DUPLICATES: Never repeat the same attraction or restaurant across different days.
-3. REALISTIC PACING: Factor in opening hours — museums often close Mon/Tue, temples open early, night markets open from 17:00. Space activities with travel time (add 20–30 min travel buffer between distant sites).
+3. REALISTIC PACING & CLOSURE DAYS: Space activities with travel time (add 20–30 min travel buffer between distant sites); temples open early, night markets open from 17:00. Day of week for each date — ${Array.from({length:chunk1End},(_,idx)=>`Day ${idx+1}=${new Date(dateOfDay(idx+1)+'T12:00:00').toLocaleDateString('en-US',{weekday:'long'})}`).join(', ')}. Before placing ANY museum, gallery or similarly-scheduled attraction on a given day, check whether it is known to close on that day of the week (most museums close Monday, some close Tuesday instead — this varies by venue, e.g. the Shanghai Museum closes Mondays) and do NOT schedule a visit there on its closure day — pick a different day for it or swap it with another day's activity instead.
 4. MEAL TYPES — strictly differentiate:
    - Lunch: casual, convenient, fast — local hawker stalls, café, street food, quick noodle/rice meals near attractions.
    - Dinner: experience-focused — signature local cuisine, rooftop dining, famous restaurant, scenic or atmospheric spot. Higher quality than lunch.
@@ -2798,6 +2798,7 @@ Do NOT backtrack to an earlier city — including for the final departure — un
 Previous day ended in: ${prevCity}
 
 Generate ONLY days ${from} through ${to}. Day ${from} date = ${dateOfDay(from)}, Day ${to} date = ${dateOfDay(to)}.
+Day of week for each date in this range — ${Array.from({length:to-from+1},(_,idx)=>`Day ${from+idx}=${new Date(dateOfDay(from+idx)+'T12:00:00').toLocaleDateString('en-US',{weekday:'long'})}`).join(', ')}. Avoid scheduling a museum/gallery on its known closure day (most close Monday, some Tuesday instead) — swap it to a different day in this range if needed.
 Continue logically from day ${from-1}. Keep same pace, style and hotel sequence.
 Group attractions geographically — no backtracking. No duplicate attractions from earlier days.
 Lunch = casual local food near attractions. Dinner = quality experience restaurant.
@@ -5334,6 +5335,20 @@ function renderGuide(g){
             <tr style="background:var(--sand-d)"><th style="padding:.35rem .6rem;text-align:left;font-size:.62rem;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-ll)">Category</th><th style="padding:.35rem .6rem;color:var(--ink-ll)">Budget</th><th style="padding:.35rem .6rem;color:var(--ink-ll)">Mid</th><th style="padding:.35rem .6rem;color:var(--ink-ll)">High</th></tr>
             ${g.budgetBreakdown.map(b=>`<tr><td style="padding:.32rem .6rem;border-bottom:1px solid var(--border)">${b.category}</td><td style="padding:.32rem .6rem;border-bottom:1px solid var(--border)">${b.low}</td><td style="padding:.32rem .6rem;border-bottom:1px solid var(--border);font-weight:500">${b.mid}</td><td style="padding:.32rem .6rem;border-bottom:1px solid var(--border)">${b.high}</td></tr>`).join('')}
           </table></div>`:''}
+        </div>
+
+        <div class="guide-section">
+          <div class="guide-section-title">🔌 Power &amp; Electrical</div>
+          <!-- Looked up from the same SOCKET_DB table the Packing List tab
+               already uses — not AI-generated, so it can't silently go
+               missing the way an AI-authored guide field sometimes can. -->
+          <div class="guide-grid">
+            ${(()=>{
+              const socketInfos=getSocketInfo(tripData?.destinations||tripData?._meta?.dests||[]);
+              if(!socketInfos.length)return'<div class="guide-item"><div class="guide-item-val">Plug type varies — bring a universal travel adapter to be safe.</div></div>';
+              return socketInfos.map(s=>`<div class="guide-item"><div class="guide-item-title">${s.info.icon||'🔌'} ${s.dest.split(',')[0].trim()}</div><div class="guide-item-val">Type ${s.info.t} — ${s.info.plug}</div><div class="guide-item-sub">${s.info.v} · ${s.info.f}</div></div>`).join('');
+            })()}
+          </div>
         </div>
 
         <div class="guide-section">
@@ -8527,6 +8542,7 @@ INSTRUCTIONS:
 - Renumber dayNumber sequentially 1–${totalDays}. Recalculate dates from ${meta.start}.
 - Update hotels/transportSummary/waypoints only if the modification requires it.
 - Within each day, arrange activities in a logical geographic order to minimise unnecessary travel — group nearby stops together, do not backtrack (e.g. do not go toward one area, detour elsewhere, then double back).
+- Day of week for each date — ${Array.from({length:chunk1End},(_,idx)=>`Day ${idx+1}=${new Date(dateOfMod(idx+1)+'T12:00:00').toLocaleDateString('en-US',{weekday:'long'})}`).join(', ')}. Before keeping or placing any museum/gallery on a given day, check whether it's known to close on that day of the week (most close Monday, some Tuesday instead, e.g. the Shanghai Museum closes Mondays) — if so, move it to a different day instead of leaving it on its closure day.
 - Include EVERY major sightseeing attraction from days 1–${chunk1End} in "mustSeeAttractions" (not just one or two per city) — this feeds the Highlights tab.${needsChunks?`
 CHUNK INSTRUCTION: This is a ${totalDays}-day trip. Generate ONLY days 1–${chunk1End} in "days". Remaining days will be requested separately.`:''}
 CRITICAL: Return ONLY valid JSON — no markdown, no code fences.
@@ -8617,6 +8633,7 @@ Already used (do NOT repeat these, and do NOT revisit an earlier city to redo th
 Do NOT backtrack to an earlier city — including for the final departure — unless the modification above explicitly asks for that city to be revisited. If the modification specifies where the trip should end, that city is the departure point; the trip does not need to return to the original arrival city (an "open-jaw" route — arrive one city, depart another — is valid and expected here).
 Previous day ended in: ${prevCity}
 Generate ONLY days ${from} through ${to}. Day ${from} date = ${dateOfMod(from)}, Day ${to} date = ${dateOfMod(to)}.
+Day of week for each date in this range — ${Array.from({length:to-from+1},(_,idx)=>`Day ${from+idx}=${new Date(dateOfMod(from+idx)+'T12:00:00').toLocaleDateString('en-US',{weekday:'long'})}`).join(', ')}. Avoid scheduling a museum/gallery on its known closure day (most close Monday, some Tuesday instead) — swap it to a different day in this range if needed.
 Within each day, arrange activities in a logical geographic order — group nearby stops together, do not backtrack.
 Also include EVERY major sightseeing attraction from these days in "mustSeeAttractions" (not just one or two) — this feeds the Highlights tab.
 CRITICAL: Return ONLY valid JSON — no markdown.
